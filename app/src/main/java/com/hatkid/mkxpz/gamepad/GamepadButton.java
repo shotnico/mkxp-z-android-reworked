@@ -20,7 +20,9 @@ public class GamepadButton extends ImageView
     private Drawable mBackgroundDrawable;
     private Drawable mForegroundDrawable;
     private String mText;
-    private int mTextSize = 36;
+    private static final int TEXT_SIZE_BASE = 36;
+    private static final int TEXT_SIZE_MIN = 8;
+    private int mTextSize = TEXT_SIZE_BASE;
     private final int mTextColor = Color.rgb(255, 255, 255);
     private final Paint mPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
@@ -158,13 +160,21 @@ public class GamepadButton extends ImageView
 
     private int getTextSize()
     {
+        // Si riparte sempre da TEXT_SIZE_BASE: mTextSize e' un campo che veniva
+        // solo decrementato, quindi una volta rimpicciolito per un'etichetta lunga
+        // restava piccolo per sempre, anche se il pulsante veniva poi ingrandito.
+        mTextSize = TEXT_SIZE_BASE;
         mPaint.setTextSize(mTextSize);
 
         int mIntrinsicWidth = (int) Math.round(mPaint.measureText(mText, 0, mText.length()) + .5);
         int mIntrinsicHeight = mPaint.getFontMetricsInt(null);
 
-        while (mIntrinsicHeight > this.getHeight() * 0.85 || mIntrinsicWidth > this.getWidth() * 0.85)
-        {
+        // Limite inferiore: senza, un'etichetta che non entra mai farebbe scendere
+        // la dimensione a zero o sotto zero.
+        while (
+            mTextSize > TEXT_SIZE_MIN &&
+            (mIntrinsicHeight > this.getHeight() * 0.85 || mIntrinsicWidth > this.getWidth() * 0.85)
+        ) {
             mTextSize -= 2;
             mPaint.setTextSize(mTextSize);
             mIntrinsicWidth = (int) Math.round(mPaint.measureText(mText, 0, mText.length()) + .5);

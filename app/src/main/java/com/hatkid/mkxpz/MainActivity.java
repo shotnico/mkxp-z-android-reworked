@@ -31,7 +31,10 @@ public class MainActivity extends SDLActivity
     // Put your Java-side stuff here.
 
     private static final String TAG = "mkxp-z[Activity]";
-    private static final String GAME_PATH_DEFAULT = Environment.getExternalStorageDirectory() + "/mkxp-z";
+    // Fire Ash ITA: cartella dedicata invece della generica "mkxp-z", cosi' l'app
+    // trova il gioco senza configurazione e non va in conflitto con altre copie di
+    // mkxp-z installate. Il valore viene letto lato nativo via JNI (src/main.cpp).
+    private static final String GAME_PATH_DEFAULT = Environment.getExternalStorageDirectory() + "/FireAshITA";
     private static String GAME_PATH = GAME_PATH_DEFAULT;
     private static String OBB_MAIN_FILENAME;
     private static boolean DEBUG = false;

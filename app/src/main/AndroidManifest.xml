@@ -52,7 +52,7 @@
         <!-- Main activity -->
         <activity
             android:name=".MainActivity"
-            android:label="mkxp-z"
+            android:label="@string/app_name"
             android:alwaysRetainTaskState="true"
             android:launchMode="singleTask"
             android:screenOrientation="sensorLandscape"

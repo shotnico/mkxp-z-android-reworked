@@ -52,9 +52,8 @@ public class Gamepad
     private GamepadButton gpadBtnZ;
     private GamepadButton gpadBtnL;
     private GamepadButton gpadBtnR;
-    private GamepadButton gpadBtnCTRL;
-    private GamepadButton gpadBtnALT;
-    private GamepadButton gpadBtnSHIFT;
+    // CTRL / ALT / SHIFT non esistono nel layout di Fire Ash: il gioco non li usa
+    // e stavano sopra la finestra dei dialoghi. Vedi gamepad_layout.xml.
 
     public void init(GamepadConfig gpadConfig, boolean invisible)
     {
@@ -84,9 +83,6 @@ public class Gamepad
         gpadBtnZ = layout.findViewById(R.id.button_Z);
         gpadBtnL = layout.findViewById(R.id.button_L);
         gpadBtnR = layout.findViewById(R.id.button_R);
-        gpadBtnCTRL = layout.findViewById(R.id.button_CTRL);
-        gpadBtnALT = layout.findViewById(R.id.button_ALT);
-        gpadBtnSHIFT = layout.findViewById(R.id.button_SHIFT);
 
         // Setup in-screen gamepad listeners
         mGamepadLayout.setOnTouchListener((view, motionEvent) -> false);
@@ -104,13 +100,19 @@ public class Gamepad
         ViewUtils.changeOpacity(mGamepadLayout, mGamepadConfig.opacity);
     }
 
-    private void setGamepadButtonKey(GamepadButton gpadBtn, Integer keycode)
+    private void setGamepadButtonKey(GamepadButton gpadBtn, Integer keycode, String label)
     {
+        // Un pulsante assente dal layout non e' un errore: il layout di Fire Ash
+        // omette CTRL/ALT/SHIFT, che il gioco non usa.
+        if (gpadBtn == null)
+            return;
+
         // Prepare label for gamepad button
-        String btnLabel = KeyEvent.keyCodeToString(keycode)
-            .replace("KEYCODE_", "")
-            .replace("_LEFT", "")
-            .replace("_RIGHT", "");
+        String btnLabel = (label != null) ? label
+            : KeyEvent.keyCodeToString(keycode)
+                .replace("KEYCODE_", "")
+                .replace("_LEFT", "")
+                .replace("_RIGHT", "");
 
         // Set gamepad button
         gpadBtn.setForegroundText(btnLabel);
@@ -144,17 +146,14 @@ public class Gamepad
 
     private void initGamepadButtons()
     {
-        setGamepadButtonKey(gpadBtnA, mGamepadConfig.keycodeA);
-        setGamepadButtonKey(gpadBtnB, mGamepadConfig.keycodeB);
-        setGamepadButtonKey(gpadBtnC, mGamepadConfig.keycodeC);
-        setGamepadButtonKey(gpadBtnX, mGamepadConfig.keycodeX);
-        setGamepadButtonKey(gpadBtnY, mGamepadConfig.keycodeY);
-        setGamepadButtonKey(gpadBtnZ, mGamepadConfig.keycodeZ);
-        setGamepadButtonKey(gpadBtnL, mGamepadConfig.keycodeL);
-        setGamepadButtonKey(gpadBtnR, mGamepadConfig.keycodeR);
-        setGamepadButtonKey(gpadBtnCTRL, mGamepadConfig.keycodeCTRL);
-        setGamepadButtonKey(gpadBtnALT, mGamepadConfig.keycodeALT);
-        setGamepadButtonKey(gpadBtnSHIFT, mGamepadConfig.keycodeSHIFT);
+        setGamepadButtonKey(gpadBtnA, mGamepadConfig.keycodeA, mGamepadConfig.labelA);
+        setGamepadButtonKey(gpadBtnB, mGamepadConfig.keycodeB, mGamepadConfig.labelB);
+        setGamepadButtonKey(gpadBtnC, mGamepadConfig.keycodeC, mGamepadConfig.labelC);
+        setGamepadButtonKey(gpadBtnX, mGamepadConfig.keycodeX, mGamepadConfig.labelX);
+        setGamepadButtonKey(gpadBtnY, mGamepadConfig.keycodeY, mGamepadConfig.labelY);
+        setGamepadButtonKey(gpadBtnZ, mGamepadConfig.keycodeZ, mGamepadConfig.labelZ);
+        setGamepadButtonKey(gpadBtnL, mGamepadConfig.keycodeL, mGamepadConfig.labelL);
+        setGamepadButtonKey(gpadBtnR, mGamepadConfig.keycodeR, mGamepadConfig.labelR);
     }
 
     public boolean processGamepadEvent(KeyEvent evt)

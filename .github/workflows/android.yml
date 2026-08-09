@@ -127,7 +127,15 @@ jobs:
           STORE_PASSWORD:  ${{ secrets.STORE_PASSWORD }}
         run: |
           echo "$KEYSTORE_BASE64" | base64 --decode > release.keystore
-          APK=$(find app/build/outputs/apk/release -name "*.apk" | head -1)
+          # Selezione esplicita dell'ABI compilata (arm64-v8a): "head -1" su tutti
+          # gli APK poteva pescarne uno senza librerie native -> crash all'avvio.
+          APK=$(find app/build/outputs/apk/release -name "*arm64-v8a*.apk" | head -1)
+          if [ -z "$APK" ]; then
+            echo "::error::Nessun APK arm64-v8a trovato in app/build/outputs/apk/release"
+            find app/build/outputs/apk -name "*.apk" || true
+            exit 1
+          fi
+          echo "APK selezionato: $APK"
           $ANDROID_HOME/build-tools/$(ls $ANDROID_HOME/build-tools | tail -1)/apksigner sign \
             --ks release.keystore \
             --ks-key-alias "$KEY_ALIAS" \
@@ -142,7 +150,15 @@ jobs:
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          APK=$(find app/build/outputs/apk/release -name "*.apk" | head -1)
+          # Selezione esplicita dell'ABI compilata (arm64-v8a): "head -1" su tutti
+          # gli APK poteva pescarne uno senza librerie native -> crash all'avvio.
+          APK=$(find app/build/outputs/apk/release -name "*arm64-v8a*.apk" | head -1)
+          if [ -z "$APK" ]; then
+            echo "::error::Nessun APK arm64-v8a trovato in app/build/outputs/apk/release"
+            find app/build/outputs/apk -name "*.apk" || true
+            exit 1
+          fi
+          echo "APK selezionato: $APK"
           cp "$APK" unsigned-release.apk
           echo "APK_PATH=unsigned-release.apk" >> "$GITHUB_ENV"
 
