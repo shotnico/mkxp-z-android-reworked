@@ -145,7 +145,18 @@ jobs:
             "$APK"
           echo "APK_PATH=signed-release.apk" >> "$GITHUB_ENV"
 
-      - name: Set unsigned APK path (no signing secrets)
+      # Senza secrets il workflow pubblicava un APK NON FIRMATO. Android rifiuta di
+      # installare un APK privo di firma (INSTALL_PARSE_FAILED_NO_CERTIFICATES):
+      # era quindi un artefatto inutilizzabile. Verificato sulla release v1.0.0:
+      # nessun META-INF/*.RSA, nessun ".SF", nessun blocco "APK Sig Block 42".
+      #
+      # Qui generiamo una chiave usa-e-getta e firmiamo comunque, cosi' l'APK si
+      # installa sempre. La chiave viene pubblicata come artifact: salvala e
+      # caricala nei secrets (KEYSTORE_BASE64 / KEY_ALIAS / KEY_PASSWORD /
+      # STORE_PASSWORD) per rendere stabile la firma. Con una firma che cambia a
+      # ogni build, ogni aggiornamento richiede di disinstallare l'app prima --
+      # e disinstallando si perdono i salvataggi sul telefono.
+      - name: Sign APK with a throwaway key (no signing secrets)
         if: ${{ env.KEYSTORE_BASE64 == '' }}
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
@@ -159,8 +170,48 @@ jobs:
             exit 1
           fi
           echo "APK selezionato: $APK"
-          cp "$APK" unsigned-release.apk
-          echo "APK_PATH=unsigned-release.apk" >> "$GITHUB_ENV"
+
+          keytool -genkeypair -v \
+            -keystore throwaway.keystore \
+            -alias fireash \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass fireash -keypass fireash \
+            -dname "CN=Fire Ash ITA, OU=Sideload, O=Personal, C=IT"
+
+          $ANDROID_HOME/build-tools/$(ls $ANDROID_HOME/build-tools | tail -1)/apksigner sign \
+            --ks throwaway.keystore \
+            --ks-key-alias fireash \
+            --ks-pass "pass:fireash" \
+            --key-pass "pass:fireash" \
+            --out signed-release.apk \
+            "$APK"
+
+          $ANDROID_HOME/build-tools/$(ls $ANDROID_HOME/build-tools | tail -1)/apksigner verify \
+            --verbose signed-release.apk
+
+          base64 -w0 throwaway.keystore > throwaway.keystore.base64
+          echo "APK_PATH=signed-release.apk" >> "$GITHUB_ENV"
+
+      - name: Upload throwaway keystore (so the signature can be made stable)
+        if: ${{ env.KEYSTORE_BASE64 == '' }}
+        uses: actions/upload-artifact@v4
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        with:
+          name: throwaway-keystore
+          path: throwaway.keystore.base64
+          retention-days: 90
+
+      # Controllo finale: un APK senza firma non si installa, meglio far fallire
+      # la build qui che scoprirlo sul telefono.
+      - name: Verify the APK is signed
+        run: |
+          $ANDROID_HOME/build-tools/$(ls $ANDROID_HOME/build-tools | tail -1)/apksigner verify \
+            "$APK_PATH" || {
+              echo "::error::L'APK prodotto non e' firmato: Android rifiutera' di installarlo."
+              exit 1
+            }
+          echo "Firma verificata su $APK_PATH"
 
       # ── 13. Upload APK as artifact (always) ───────────────────────────────────
       - name: Upload APK artifact
