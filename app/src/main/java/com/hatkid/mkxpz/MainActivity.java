@@ -34,7 +34,31 @@ public class MainActivity extends SDLActivity
     // Fire Ash ITA: cartella dedicata invece della generica "mkxp-z", cosi' l'app
     // trova il gioco senza configurazione e non va in conflitto con altre copie di
     // mkxp-z installate. Il valore viene letto lato nativo via JNI (src/main.cpp).
-    private static final String GAME_PATH_DEFAULT = Environment.getExternalStorageDirectory() + "/FireAshITA";
+    //
+    // Accettiamo anche la vecchia cartella "mkxp-z": chi ha gia' copiato il gioco
+    // li' per provarlo con l'APK generico non deve rinominare 553 MB di file.
+    private static final String[] GAME_PATH_CANDIDATES = {
+        Environment.getExternalStorageDirectory() + "/FireAshITA",
+        Environment.getExternalStorageDirectory() + "/mkxp-z",
+    };
+    private static final String GAME_PATH_DEFAULT = GAME_PATH_CANDIDATES[0];
+
+    /**
+     * Sceglie la prima cartella di gioco che esiste davvero (deve contenere Data/).
+     * Se nessuna esiste ritorna la prima, cosi' mkxp-z mostra il suo errore normale.
+     *
+     * Va chiamata da runSDLThread(), NON da un inizializzatore statico: prima che
+     * l'utente conceda "Accesso a tutti i file" ogni isDirectory() su /sdcard
+     * ritorna false, e il risultato resterebbe congelato sbagliato.
+     */
+    private static String resolveGamePath()
+    {
+        for (String candidate : GAME_PATH_CANDIDATES) {
+            if (new File(candidate, "Data").isDirectory())
+                return candidate;
+        }
+        return GAME_PATH_DEFAULT;
+    }
     private static String GAME_PATH = GAME_PATH_DEFAULT;
     private static String OBB_MAIN_FILENAME;
     private static boolean DEBUG = false;
@@ -50,6 +74,13 @@ public class MainActivity extends SDLActivity
     private void runSDLThread()
     {
         if (!mStarted) {
+            // Risolto qui e non prima: a questo punto il permesso di accesso allo
+            // storage e' stato concesso, quindi le cartelle sono davvero visibili.
+            // Se un OBB e' stato montato, GAME_PATH e' gia' stato impostato dal
+            // listener e non va sovrascritto.
+            if (GAME_PATH.equals(GAME_PATH_DEFAULT)) {
+                GAME_PATH = resolveGamePath();
+            }
             Log.i(TAG, "Game path: " + GAME_PATH);
         }
 
