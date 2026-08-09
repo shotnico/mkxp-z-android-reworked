@@ -1,21 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Layout dei controlli a schermo - versione Pokemon Fire Ash ITA.
+    Controlli a schermo - disposizione "Game Boy" per Pokemon Fire Ash ITA.
 
-    Differenze rispetto al layout originale di mkxp-z-android:
+    Idea: due pulsanti GRANDI in diagonale come su Game Boy / Game Boy Advance
+    (B in basso a sinistra, A in alto a destra), e tutto il resto piccolo e
+    defilato, cosi' si capisce a colpo d'occhio quali sono i principali.
 
-    1. Rimossa la fila CTRL / ALT / SHIFT. Era ancorata in basso al centro,
-       cioe' esattamente sopra la finestra dei dialoghi di Pokemon Essentials,
-       e il gioco quei tasti non li usa (vedi "bindingNames" in mkxp.json:
-       solo a, b, c, x, y, z, l, r). Gamepad.java tollera la loro assenza.
-    2. Pulsanti d'azione (A/B/C) ingranditi: sono quelli usati di continuo
-       (interagire, aprire il menu, correre).
-    3. X / Y / Z rimpiccioliti: servono solo per scorrere le liste e per
-       l'oggetto registrato.
-    4. D-Pad ingrandito: il movimento e' l'input piu' usato in assoluto.
+        A = conferma / interagisci / avanza nei dialoghi   (pulsante RGSS "C")
+        B = indietro / apre il menu                        (pulsante RGSS "B")
 
-    Con "fixedAspectRatio": true in mkxp.json il gioco 4:3 resta centrato e i
-    controlli finiscono sulle bande nere laterali, senza coprire la scena.
+    Le etichette dicono A e B perche' e' cio' che uno si aspetta da un gioco
+    Pokemon, NON i nomi RGSS: attenzione, il pulsante RGSS chiamato "A" e'
+    quello della corsa, ed e' etichettato CORSA. La corrispondenza completa e':
+
+        etichetta   pulsante RGSS   tasto iniettato   funzione
+        [A]         C               C                 conferma / interagisci
+        [B]         B               X                 indietro / menu
+        [CORSA]     A               Z                 correre (tenere premuto)
+        [OGG]       Z               D                 oggetto registrato
+        [SU] [GIU]  X / Y           A / S             scorrere le liste
+        [L] [R]     L / R           Q / W             salva-ordina zaino, velocizza
+
+    Rispetto al layout originale di mkxp-z-android:
+      - tolta la fila CTRL / ALT / SHIFT: il gioco non usa quei tasti e stava
+        ancorata in basso al centro, cioe' sopra la finestra dei dialoghi;
+      - A e B molto piu' grandi degli altri e disposti in diagonale;
+      - CORSA a portata del pollice destro, da tenere premuto mentre si cammina;
+      - SU / GIU / OGG piccoli e in alto, servono di rado.
+
+    Con "fixedAspectRatio": true il gioco 4:3 resta centrato e i controlli
+    finiscono sulle bande nere laterali, senza coprire la scena.
 -->
 <RelativeLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
@@ -27,187 +41,143 @@
     android:layoutDirection="ltr"
     android:orientation="vertical"
 >
+    <!-- ===================== D-Pad: movimento ===================== -->
     <com.hatkid.mkxpz.gamepad.GamepadDPad
         android:id="@+id/dpad"
-        android:layout_width="@dimen/_125sdp"
-        android:layout_height="@dimen/_125sdp"
+        android:layout_width="@dimen/_130sdp"
+        android:layout_height="@dimen/_130sdp"
         android:layout_alignParentStart="true"
         android:layout_alignParentBottom="true"
-        android:layout_centerInParent="true"
-        android:layout_marginStart="@dimen/_10sdp"
-        android:layout_marginTop="@dimen/_10sdp"
-        android:layout_marginEnd="@dimen/_10sdp"
-        android:layout_marginBottom="@dimen/_10sdp"
+        android:layout_marginStart="@dimen/_12sdp"
+        android:layout_marginBottom="@dimen/_12sdp"
         android:clickable="false"
         android:focusable="false"
         app:bgDrawable="@drawable/gamepad_dpad_back"
         app:fgDrawable="@drawable/gamepad_dpad_front"
     />
 
-    <!-- L = Salva / Ordina Zaino -->
+    <!-- ===================== L: salva / ordina zaino ===================== -->
     <RelativeLayout
         android:id="@+id/buttons_misc_left_layout"
-        android:layout_width="@dimen/_42sdp"
-        android:layout_height="@dimen/_42sdp"
-        android:layout_marginStart="@dimen/_10sdp"
-        android:layout_marginTop="@dimen/_25sdp"
-        android:layout_marginEnd="@dimen/_10sdp"
-        android:layout_marginBottom="@dimen/_10sdp"
+        android:layout_width="@dimen/_44sdp"
+        android:layout_height="@dimen/_44sdp"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginStart="@dimen/_12sdp"
+        android:layout_marginTop="@dimen/_14sdp"
     >
-        <LinearLayout
-            android:id="@+id/buttons_misc_left_row"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:orientation="horizontal"
-            tools:ignore="UselessParent"
-        >
-            <com.hatkid.mkxpz.gamepad.GamepadButton
-                android:id="@+id/button_L"
-                android:layout_width="@dimen/_38sdp"
-                android:layout_height="@dimen/_38sdp"
-                android:layout_marginStart="@dimen/_2sdp"
-                android:layout_marginTop="@dimen/_2sdp"
-                android:layout_marginEnd="@dimen/_2sdp"
-                android:layout_marginBottom="@dimen/_2sdp"
-                app:bgDrawable="@drawable/gamepad_button_circle"
-                tools:ignore="ImageContrastCheck"
-            />
-        </LinearLayout>
+        <com.hatkid.mkxpz.gamepad.GamepadButton
+            android:id="@+id/button_L"
+            android:layout_width="@dimen/_40sdp"
+            android:layout_height="@dimen/_40sdp"
+            android:layout_centerInParent="true"
+            app:bgDrawable="@drawable/gamepad_button_circle"
+            tools:ignore="ImageContrastCheck"
+        />
     </RelativeLayout>
 
-    <!-- R = Velocizza -->
+    <!-- ===================== R: velocizza ===================== -->
     <RelativeLayout
         android:id="@+id/buttons_misc_right_layout"
-        android:layout_width="@dimen/_42sdp"
-        android:layout_height="@dimen/_42sdp"
+        android:layout_width="@dimen/_44sdp"
+        android:layout_height="@dimen/_44sdp"
         android:layout_alignParentEnd="true"
-        android:layout_marginStart="@dimen/_10sdp"
-        android:layout_marginTop="@dimen/_25sdp"
-        android:layout_marginEnd="@dimen/_10sdp"
-        android:layout_marginBottom="@dimen/_10sdp"
+        android:layout_alignParentTop="true"
+        android:layout_marginEnd="@dimen/_12sdp"
+        android:layout_marginTop="@dimen/_14sdp"
     >
-        <LinearLayout
-            android:id="@+id/buttons_misc_right_row"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:orientation="horizontal"
-            tools:ignore="UselessParent"
-        >
-            <com.hatkid.mkxpz.gamepad.GamepadButton
-                android:id="@+id/button_R"
-                android:layout_width="@dimen/_38sdp"
-                android:layout_height="@dimen/_38sdp"
-                android:layout_marginStart="@dimen/_2sdp"
-                android:layout_marginTop="@dimen/_2sdp"
-                android:layout_marginEnd="@dimen/_2sdp"
-                android:layout_marginBottom="@dimen/_2sdp"
-                app:bgDrawable="@drawable/gamepad_button_circle"
-                tools:ignore="ImageContrastCheck"
-            />
-        </LinearLayout>
+        <com.hatkid.mkxpz.gamepad.GamepadButton
+            android:id="@+id/button_R"
+            android:layout_width="@dimen/_40sdp"
+            android:layout_height="@dimen/_40sdp"
+            android:layout_centerInParent="true"
+            app:bgDrawable="@drawable/gamepad_button_circle"
+            tools:ignore="ImageContrastCheck"
+        />
     </RelativeLayout>
 
-    <!-- Cluster d'azione: X/Y/Z sopra (piccoli), A/B/C sotto (grandi) -->
+    <!-- ============ Secondari: SU / GIU / OGG, piccoli e in alto ============ -->
+    <LinearLayout
+        android:id="@+id/buttons_action_row_1"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_above="@+id/buttons_action_layout"
+        android:layout_alignParentEnd="true"
+        android:layout_marginEnd="@dimen/_16sdp"
+        android:layout_marginBottom="@dimen/_6sdp"
+        android:orientation="horizontal"
+    >
+        <com.hatkid.mkxpz.gamepad.GamepadButton
+            android:id="@+id/button_X"
+            android:layout_width="@dimen/_30sdp"
+            android:layout_height="@dimen/_30sdp"
+            android:layout_marginStart="@dimen/_4sdp"
+            android:layout_marginEnd="@dimen/_4sdp"
+            app:bgDrawable="@drawable/gamepad_button_circle"
+            tools:ignore="ImageContrastCheck"
+        />
+        <com.hatkid.mkxpz.gamepad.GamepadButton
+            android:id="@+id/button_Y"
+            android:layout_width="@dimen/_30sdp"
+            android:layout_height="@dimen/_30sdp"
+            android:layout_marginStart="@dimen/_4sdp"
+            android:layout_marginEnd="@dimen/_4sdp"
+            app:bgDrawable="@drawable/gamepad_button_circle"
+            tools:ignore="ImageContrastCheck"
+        />
+        <com.hatkid.mkxpz.gamepad.GamepadButton
+            android:id="@+id/button_Z"
+            android:layout_width="@dimen/_30sdp"
+            android:layout_height="@dimen/_30sdp"
+            android:layout_marginStart="@dimen/_4sdp"
+            android:layout_marginEnd="@dimen/_4sdp"
+            app:bgDrawable="@drawable/gamepad_button_circle"
+            tools:ignore="ImageContrastCheck"
+        />
+    </LinearLayout>
+
+    <!-- ============ Principali: B e A grandi, in diagonale ============ -->
     <RelativeLayout
         android:id="@+id/buttons_action_layout"
-        android:layout_width="@dimen/_160sdp"
-        android:layout_height="@dimen/_98sdp"
+        android:layout_width="@dimen/_150sdp"
+        android:layout_height="@dimen/_118sdp"
         android:layout_alignParentEnd="true"
         android:layout_alignParentBottom="true"
-        android:layout_marginStart="@dimen/_10sdp"
-        android:layout_marginTop="@dimen/_10sdp"
-        android:layout_marginEnd="@dimen/_10sdp"
-        android:layout_marginBottom="@dimen/_10sdp"
+        android:layout_marginEnd="@dimen/_14sdp"
+        android:layout_marginBottom="@dimen/_12sdp"
     >
-        <LinearLayout
-            android:id="@+id/buttons_action_row_1"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_alignParentTop="true"
-            android:layout_centerHorizontal="true"
-            android:orientation="horizontal"
-        >
-            <!-- X = Scorri su -->
-            <com.hatkid.mkxpz.gamepad.GamepadButton
-                android:id="@+id/button_X"
-                android:layout_width="@dimen/_30sdp"
-                android:layout_height="@dimen/_30sdp"
-                android:layout_marginStart="@dimen/_3sdp"
-                android:layout_marginTop="@dimen/_2sdp"
-                android:layout_marginEnd="@dimen/_3sdp"
-                android:layout_marginBottom="@dimen/_2sdp"
-                app:bgDrawable="@drawable/gamepad_button_circle"
-                tools:ignore="ImageContrastCheck"
-            />
-            <!-- Y = Scorri giu -->
-            <com.hatkid.mkxpz.gamepad.GamepadButton
-                android:id="@+id/button_Y"
-                android:layout_width="@dimen/_30sdp"
-                android:layout_height="@dimen/_30sdp"
-                android:layout_marginStart="@dimen/_3sdp"
-                android:layout_marginTop="@dimen/_2sdp"
-                android:layout_marginEnd="@dimen/_3sdp"
-                android:layout_marginBottom="@dimen/_2sdp"
-                app:bgDrawable="@drawable/gamepad_button_circle"
-                tools:ignore="ImageContrastCheck"
-            />
-            <!-- Z = Oggetto registrato -->
-            <com.hatkid.mkxpz.gamepad.GamepadButton
-                android:id="@+id/button_Z"
-                android:layout_width="@dimen/_30sdp"
-                android:layout_height="@dimen/_30sdp"
-                android:layout_marginStart="@dimen/_3sdp"
-                android:layout_marginTop="@dimen/_2sdp"
-                android:layout_marginEnd="@dimen/_3sdp"
-                android:layout_marginBottom="@dimen/_2sdp"
-                app:bgDrawable="@drawable/gamepad_button_circle"
-                tools:ignore="ImageContrastCheck"
-            />
-        </LinearLayout>
-        <LinearLayout
-            android:id="@+id/buttons_action_row_2"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+        <!-- B = indietro / menu : in basso a sinistra -->
+        <com.hatkid.mkxpz.gamepad.GamepadButton
+            android:id="@+id/button_B"
+            android:layout_width="@dimen/_64sdp"
+            android:layout_height="@dimen/_64sdp"
+            android:layout_alignParentStart="true"
             android:layout_alignParentBottom="true"
-            android:layout_centerHorizontal="true"
-            android:orientation="horizontal"
-        >
-            <!-- A = Corri (da tenere premuto assieme al D-Pad) -->
-            <com.hatkid.mkxpz.gamepad.GamepadButton
-                android:id="@+id/button_A"
-                android:layout_width="@dimen/_46sdp"
-                android:layout_height="@dimen/_46sdp"
-                android:layout_marginStart="@dimen/_2sdp"
-                android:layout_marginTop="@dimen/_2sdp"
-                android:layout_marginEnd="@dimen/_2sdp"
-                android:layout_marginBottom="@dimen/_2sdp"
-                app:bgDrawable="@drawable/gamepad_button_circle"
-                tools:ignore="ImageContrastCheck"
-            />
-            <!-- B = Indietro / Menu -->
-            <com.hatkid.mkxpz.gamepad.GamepadButton
-                android:id="@+id/button_B"
-                android:layout_width="@dimen/_46sdp"
-                android:layout_height="@dimen/_46sdp"
-                android:layout_marginStart="@dimen/_2sdp"
-                android:layout_marginTop="@dimen/_2sdp"
-                android:layout_marginEnd="@dimen/_2sdp"
-                android:layout_marginBottom="@dimen/_2sdp"
-                app:bgDrawable="@drawable/gamepad_button_circle"
-                tools:ignore="ImageContrastCheck"
-            />
-            <!-- C = Usa / Interagisci / Conferma (il piu' usato) -->
-            <com.hatkid.mkxpz.gamepad.GamepadButton
-                android:id="@+id/button_C"
-                android:layout_width="@dimen/_52sdp"
-                android:layout_height="@dimen/_52sdp"
-                android:layout_marginStart="@dimen/_2sdp"
-                android:layout_marginTop="@dimen/_2sdp"
-                android:layout_marginEnd="@dimen/_2sdp"
-                android:layout_marginBottom="@dimen/_2sdp"
-                app:bgDrawable="@drawable/gamepad_button_circle"
-                tools:ignore="ImageContrastCheck"
-            />
-        </LinearLayout>
+            app:bgDrawable="@drawable/gamepad_button_circle"
+            tools:ignore="ImageContrastCheck"
+        />
+        <!-- A = conferma / interagisci : in alto a destra -->
+        <com.hatkid.mkxpz.gamepad.GamepadButton
+            android:id="@+id/button_C"
+            android:layout_width="@dimen/_64sdp"
+            android:layout_height="@dimen/_64sdp"
+            android:layout_alignParentEnd="true"
+            android:layout_alignParentTop="true"
+            app:bgDrawable="@drawable/gamepad_button_circle"
+            tools:ignore="ImageContrastCheck"
+        />
     </RelativeLayout>
+
+    <!-- ============ CORSA: da tenere premuto camminando ============ -->
+    <com.hatkid.mkxpz.gamepad.GamepadButton
+        android:id="@+id/button_A"
+        android:layout_width="@dimen/_48sdp"
+        android:layout_height="@dimen/_48sdp"
+        android:layout_toStartOf="@+id/buttons_action_layout"
+        android:layout_alignParentBottom="true"
+        android:layout_marginEnd="@dimen/_4sdp"
+        android:layout_marginBottom="@dimen/_16sdp"
+        app:bgDrawable="@drawable/gamepad_button_circle"
+        tools:ignore="ImageContrastCheck"
+    />
 </RelativeLayout>

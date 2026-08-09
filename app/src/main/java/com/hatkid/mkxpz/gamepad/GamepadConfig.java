@@ -40,9 +40,13 @@ public class GamepadConfig
     // ("Z", "X", "C", "A"...), incomprensibile per chi gioca. Qui usiamo le
     // funzioni reali in Fire Ash, come da "bindingNames" di mkxp.json.
     // Tenerle corte: il testo viene rimpicciolito fino a entrare nel pulsante.
+    // A e B sono i nomi che ci si aspetta da un gioco Pokemon, NON i nomi RGSS:
+    // il pulsante RGSS chiamato "A" e' quello della corsa (etichettato CORSA).
+    //   labelC -> "A"  = conferma / interagisci
+    //   labelB -> "B"  = indietro / menu
     public final String labelA = "CORSA";
-    public final String labelB = "MENU";
-    public final String labelC = "USA";
+    public final String labelB = "B";
+    public final String labelC = "A";
     public final String labelX = "SU";
     public final String labelY = "GIU";
     public final String labelZ = "OGG";
