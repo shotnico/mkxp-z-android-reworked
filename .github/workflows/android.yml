@@ -126,7 +126,15 @@ jobs:
           KEY_PASSWORD:    ${{ secrets.KEY_PASSWORD }}
           STORE_PASSWORD:  ${{ secrets.STORE_PASSWORD }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 --decode > release.keystore
+          # Tollera spazi e ritorni a capo nel secret: una volta il contenuto e'
+          # arrivato con la codifica alterata e base64 rispondeva solo
+          # "invalid input", senza dire cosa fosse sbagliato.
+          printf '%s' "$KEYSTORE_BASE64" | tr -d '[:space:]' | base64 -d > release.keystore
+          if [ ! -s release.keystore ]; then
+            echo "::error::KEYSTORE_BASE64 non e' base64 valido: keystore vuoto"
+            exit 1
+          fi
+          echo "keystore decodificato: $(stat -c%s release.keystore) byte"
           # Selezione esplicita dell'ABI compilata (arm64-v8a): "head -1" su tutti
           # gli APK poteva pescarne uno senza librerie native -> crash all'avvio.
           APK=$(find app/build/outputs/apk/release -name "*arm64-v8a*.apk" | head -1)
