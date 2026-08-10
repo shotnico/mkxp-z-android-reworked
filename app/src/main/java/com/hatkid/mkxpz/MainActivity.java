@@ -467,6 +467,11 @@ public class MainActivity extends SDLActivity
             mGamepad.attachTo(this, mLayout);
             if (mGamepadInvisible)
                 mGamepad.hideView();
+            // Riattaccare il gamepad lo rimette come ultimo figlio, quindi sopra
+            // all'overlay: dopo una rotazione i tasti finivano disegnati sopra le
+            // impostazioni. L'overlay va riportato davanti.
+            if (mLoadingOverlay != null)
+                mLoadingOverlay.bringToFront();
         } catch (Exception e) {
             Log.w(TAG, "Rotazione: gamepad non riattaccato: " + e);
         }
