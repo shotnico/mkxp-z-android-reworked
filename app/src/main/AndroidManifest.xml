@@ -49,23 +49,37 @@
         android:allowBackup="true"
         android:requestLegacyExternalStorage="true"
     >
-        <!-- Main activity -->
+        <!-- Schermata iniziale: e' questa che si apre dal launcher.
+             Copre l'attesa dell'avvio, regola i tasti e scambia la lingua. -->
         <activity
-            android:name=".MainActivity"
+            android:name=".LauncherActivity"
             android:label="@string/app_name"
-            android:alwaysRetainTaskState="true"
-            android:launchMode="singleTask"
-            android:screenOrientation="sensorLandscape"
-            android:configChanges="layoutDirection|locale|orientation|uiMode|screenLayout|screenSize|smallestScreenSize|density|keyboard|keyboardHidden|navigation"
-            android:resizeableActivity="true"
-            android:preferMinimalPostProcessing="true"
+            android:screenOrientation="portrait"
             android:exported="true"
         >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity>
 
+        <!-- Main activity: avviata dalla schermata iniziale, non piu' dal launcher.
+             screenOrientation e' fullSensor perche' l'orientamento effettivo viene
+             deciso a runtime da applyOrientationPreference(); cosi' si evita il
+             lampo in orizzontale prima che la preferenza venga applicata. -->
+        <activity
+            android:name=".MainActivity"
+            android:label="@string/app_name"
+            android:alwaysRetainTaskState="true"
+            android:launchMode="singleTask"
+            android:screenOrientation="fullSensor"
+            android:configChanges="layoutDirection|locale|orientation|uiMode|screenLayout|screenSize|smallestScreenSize|density|keyboard|keyboardHidden|navigation"
+            android:resizeableActivity="true"
+            android:preferMinimalPostProcessing="true"
+            android:exported="true"
+        >
+            <intent-filter>
                 <!-- Let Android know that we can handle some USB devices and should receive this event -->
                 <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
             </intent-filter>

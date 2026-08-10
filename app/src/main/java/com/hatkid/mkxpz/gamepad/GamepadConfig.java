@@ -1,22 +1,63 @@
 package com.hatkid.mkxpz.gamepad;
 
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.view.KeyEvent;
 
+/**
+ * Configurazione dei controlli a schermo.
+ *
+ * I valori regolabili (opacita', dimensione, disposizione, orientamento) sono
+ * salvati in SharedPreferences dalla schermata iniziale, cosi' si cambiano dal
+ * telefono senza ricompilare l'APK.
+ */
 public class GamepadConfig
 {
-    /** In-screen gamepad settings **/
+    /** Nome del file di preferenze, condiviso con la schermata iniziale. */
+    public static final String PREFS = "fireash";
 
-    // Opacity of view elements in percentage (default: 30)
-    // Fire Ash: 30 e' troppo tenue sopra le mappe chiare dell'overworld.
-    public Integer opacity = 45;
+    public static final String KEY_OPACITY     = "gamepad_opacity";
+    public static final String KEY_SCALE       = "gamepad_scale";
+    public static final String KEY_ORIENTATION = "orientation";
+    public static final String KEY_LANGUAGE    = "language";
 
-    // View elements scale in percentage (default: 100)
+    /** Orientamento: 0 = automatico, 1 = solo orizzontale, 2 = solo verticale. */
+    public static final int ORIENT_AUTO      = 0;
+    public static final int ORIENT_LANDSCAPE = 1;
+    public static final int ORIENT_PORTRAIT  = 2;
+
+    // Opacita' in percentuale. ViewUtils.changeOpacity la mappa su 0-255, quindi
+    // il 45 originale dava 115 su 255: i tasti sparivano con un po' di luce.
+    public Integer opacity = 80;
+
+    // Dimensione in percentuale.
     public Integer scale = 100;
 
-    // Whether use diagonal (8-way) movement on D-Pad (default: false)
     // Pokemon Essentials ha movimento a 4 direzioni: lasciare false, altrimenti
     // le diagonali generano input che il gioco non sa gestire.
     public Boolean diagonalMovement = false;
+
+    /** Legge i valori salvati; i campi non presenti restano ai valori predefiniti. */
+    public static GamepadConfig load(Context context)
+    {
+        GamepadConfig c = new GamepadConfig();
+
+        if (context == null)
+            return c;
+
+        SharedPreferences p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        c.opacity = p.getInt(KEY_OPACITY, c.opacity);
+        c.scale   = p.getInt(KEY_SCALE,   c.scale);
+
+        // limiti di sicurezza: un valore assurdo salvato renderebbe i tasti
+        // invisibili o giganti, senza modo di rimediare dal gioco
+        if (c.opacity < 20)  c.opacity = 20;
+        if (c.opacity > 100) c.opacity = 100;
+        if (c.scale < 60)    c.scale = 60;
+        if (c.scale > 160)   c.scale = 160;
+
+        return c;
+    }
 
     /** Key bindings for each RGSS input **/
     // Questi keycode sono la mappatura tastiera predefinita di RPG Maker XP:
@@ -36,10 +77,6 @@ public class GamepadConfig
     public final Integer keycodeSHIFT = KeyEvent.KEYCODE_SHIFT_LEFT;
 
     /** Etichette mostrate sui pulsanti a schermo **/
-    // Il comportamento originale disegnava il nome del tasto di tastiera
-    // ("Z", "X", "C", "A"...), incomprensibile per chi gioca. Qui usiamo le
-    // funzioni reali in Fire Ash, come da "bindingNames" di mkxp.json.
-    // Tenerle corte: il testo viene rimpicciolito fino a entrare nel pulsante.
     // A e B sono i nomi che ci si aspetta da un gioco Pokemon, NON i nomi RGSS:
     // il pulsante RGSS chiamato "A" e' quello della corsa (etichettato CORSA).
     //   labelC -> "A"  = conferma / interagisci

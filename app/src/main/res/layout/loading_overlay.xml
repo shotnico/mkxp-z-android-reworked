@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Schermata di caricamento mostrata SOPRA la superficie di gioco.
+
+    Perche' e' una View Android e non qualcosa disegnato dal gioco: nei primi ~80 s
+    mkxp-z non presenta nulla, e in quella fase non compare niente di disegnato dal
+    gioco (verificato: nemmeno un rettangolo a z=999999). Le View Android invece si
+    vedono, perche' non passano da quella presentazione.
+
+    Si tocca per nasconderla, oppure sparisce da sola (LOADING_OVERLAY_MS).
+-->
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/loading_overlay"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0D0D14"
+    android:clickable="true"
+    android:focusable="true"
+>
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerInParent="true"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="24dp"
+    >
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/app_name"
+            android:textColor="#F5F5F5"
+            android:textSize="20sp"
+            android:textStyle="bold"
+        />
+
+        <ProgressBar
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:layout_marginBottom="18dp"
+            style="?android:attr/progressBarStyleLarge"
+        />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/loading_body"
+            android:textColor="#AAB0C4"
+            android:textSize="13sp"
+            android:gravity="center"
+        />
+
+        <Button
+            android:id="@+id/loading_skip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="22dp"
+            android:text="@string/loading_skip"
+        />
+    </LinearLayout>
+</RelativeLayout>

@@ -121,6 +121,26 @@ public class Gamepad
         gpadBtn.setOnKeyUpListener(key -> mOnKeyUpListener.onKeyUp(key));
     }
 
+    /**
+     * Stacca i controlli dalla gerarchia di view.
+     *
+     * Serve alla rotazione dello schermo: MainActivity dichiara
+     * configChanges="orientation|screenSize", quindi NON viene ricreata, e senza
+     * questo il layout orizzontale resterebbe anche in verticale. Si stacca e si
+     * richiama attachTo, che rigonfia la risorsa giusta (res/layout-port o
+     * res/layout).
+     */
+    public void detach()
+    {
+        if (mGamepadLayout == null)
+            return;
+
+        if (mGamepadLayout.getParent() instanceof ViewGroup)
+            ((ViewGroup) mGamepadLayout.getParent()).removeView(mGamepadLayout);
+
+        mGamepadLayout = null;
+    }
+
     public void showView()
     {
         if (mGamepadLayout != null) {

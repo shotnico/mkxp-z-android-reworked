@@ -5,12 +5,17 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.InputDevice;
+import android.view.View;
+import android.view.ViewGroup;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.Vibrator;
 import android.os.VibrationEffect;
 import android.os.storage.StorageManager;
@@ -24,6 +29,7 @@ import java.io.File;
 import org.libsdl.app.SDLActivity;
 import com.hatkid.mkxpz.gamepad.Gamepad;
 import com.hatkid.mkxpz.gamepad.GamepadConfig;
+import com.hatkid.mkxpz.utils.GameFolder;
 
 public class MainActivity extends SDLActivity
 {
@@ -37,28 +43,14 @@ public class MainActivity extends SDLActivity
     //
     // Accettiamo anche la vecchia cartella "mkxp-z": chi ha gia' copiato il gioco
     // li' per provarlo con l'APK generico non deve rinominare 553 MB di file.
-    private static final String[] GAME_PATH_CANDIDATES = {
-        Environment.getExternalStorageDirectory() + "/FireAshITA",
-        Environment.getExternalStorageDirectory() + "/mkxp-z",
-    };
-    private static final String GAME_PATH_DEFAULT = GAME_PATH_CANDIDATES[0];
-
-    /**
-     * Sceglie la prima cartella di gioco che esiste davvero (deve contenere Data/).
-     * Se nessuna esiste ritorna la prima, cosi' mkxp-z mostra il suo errore normale.
-     *
-     * Va chiamata da runSDLThread(), NON da un inizializzatore statico: prima che
-     * l'utente conceda "Accesso a tutti i file" ogni isDirectory() su /sdcard
-     * ritorna false, e il risultato resterebbe congelato sbagliato.
-     */
-    private static String resolveGamePath()
-    {
-        for (String candidate : GAME_PATH_CANDIDATES) {
-            if (new File(candidate, "Data").isDirectory())
-                return candidate;
-        }
-        return GAME_PATH_DEFAULT;
-    }
+    // La risoluzione del percorso e lo scambio della lingua stanno in
+    // utils/GameFolder, condivisi con LauncherActivity.
+    //
+    // ATTENZIONE: va risolto da runSDLThread(), NON da un inizializzatore statico:
+    // prima che l'utente conceda "Accesso a tutti i file" ogni isDirectory() su
+    // /sdcard ritorna false, e il risultato resterebbe congelato sbagliato.
+    private static final String GAME_PATH_DEFAULT =
+        Environment.getExternalStorageDirectory() + "/FireAshITA";
     private static String GAME_PATH = GAME_PATH_DEFAULT;
     private static String OBB_MAIN_FILENAME;
     private static boolean DEBUG = false;
@@ -69,7 +61,12 @@ public class MainActivity extends SDLActivity
 
     // In-screen gamepad
     private final Gamepad mGamepad = new Gamepad();
+    private GamepadConfig mGamepadConfig;
     private boolean mGamepadInvisible = false;
+
+    // Schermata di caricamento sopra la superficie di gioco
+    private static final long LOADING_OVERLAY_MS = 95000;   // ~85 s di avvio + margine
+    private View mLoadingOverlay;
 
     private void runSDLThread()
     {
@@ -79,7 +76,7 @@ public class MainActivity extends SDLActivity
             // Se un OBB e' stato montato, GAME_PATH e' gia' stato impostato dal
             // listener e non va sovrascritto.
             if (GAME_PATH.equals(GAME_PATH_DEFAULT)) {
-                GAME_PATH = resolveGamePath();
+                GAME_PATH = GameFolder.resolve();
             }
             Log.i(TAG, "Game path: " + GAME_PATH);
         }
@@ -166,15 +163,106 @@ public class MainActivity extends SDLActivity
             }
         }
 
+        // Orientamento scelto nella schermata iniziale. In verticale mkxp-z tiene
+        // il gioco 4:3 centrato e i tasti stanno nella banda bassa (stile Game Boy):
+        // vedi res/layout-port/gamepad_layout.xml.
+        applyOrientationPreference();
+
         // Setup in-screen gamepad
         mGamepadInvisible = (isAndroidTV() || isChromebook());
-        GamepadConfig gpadConfig = new GamepadConfig();
-        mGamepad.init(gpadConfig, mGamepadInvisible);
+        // Opacita' e dimensione arrivano da SharedPreferences, cosi' si regolano dal
+        // telefono senza ricompilare. Il valore originale del port era 45, cioe'
+        // alpha 115 su 255: i tasti sparivano con un po' di luce.
+        mGamepadConfig = GamepadConfig.load(this);
+        mGamepad.init(mGamepadConfig, mGamepadInvisible);
         mGamepad.setOnKeyDownListener(SDLActivity::onNativeKeyDown);
         mGamepad.setOnKeyUpListener(SDLActivity::onNativeKeyUp);
 
         if (mLayout != null) {
             mGamepad.attachTo(this, mLayout);
+            showLoadingOverlay();
+        }
+    }
+
+    private void applyOrientationPreference()
+    {
+        int orient = getSharedPreferences(GamepadConfig.PREFS, MODE_PRIVATE)
+                        .getInt(GamepadConfig.KEY_ORIENTATION, GamepadConfig.ORIENT_AUTO);
+
+        if (orient == GamepadConfig.ORIENT_LANDSCAPE)
+            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+        else if (orient == GamepadConfig.ORIENT_PORTRAIT)
+            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT);
+        else
+            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);
+    }
+
+    /**
+     * Schermata di caricamento sopra la superficie di gioco.
+     *
+     * Serve perche' l'avvio richiede ~85 s, di cui ~80 in cui mkxp-z non presenta
+     * ancora nulla: misurato che in quella fase non compare NIENTE, nemmeno un
+     * rettangolo disegnato dal gioco a z=999999. Le View Android invece si vedono,
+     * perche' non passano dalla presentazione di mkxp-z -- e' l'unico modo di
+     * mostrare qualcosa durante l'attesa.
+     *
+     * Non sappiamo dall'esterno quando il gioco inizia a presentare, quindi la
+     * schermata si toglie al tocco oppure da sola dopo il tempo tipico.
+     */
+    private void showLoadingOverlay()
+    {
+        try {
+            mLoadingOverlay = getLayoutInflater().inflate(R.layout.loading_overlay, mLayout, false);
+            mLayout.addView(mLoadingOverlay);   // aggiunta per ultima = sopra a tutto
+
+            View.OnClickListener dismiss = new View.OnClickListener() {
+                @Override public void onClick(View v) { hideLoadingOverlay(); }
+            };
+            mLoadingOverlay.setOnClickListener(dismiss);
+            View skip = mLoadingOverlay.findViewById(R.id.loading_skip);
+            if (skip != null)
+                skip.setOnClickListener(dismiss);
+
+            new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                @Override public void run() { hideLoadingOverlay(); }
+            }, LOADING_OVERLAY_MS);
+        } catch (Exception e) {
+            Log.w(TAG, "Loading overlay non mostrata: " + e);
+        }
+    }
+
+    private void hideLoadingOverlay()
+    {
+        if (mLoadingOverlay == null)
+            return;
+
+        if (mLoadingOverlay.getParent() instanceof ViewGroup)
+            ((ViewGroup) mLoadingOverlay.getParent()).removeView(mLoadingOverlay);
+
+        mLoadingOverlay = null;
+    }
+
+    /**
+     * L'activity dichiara configChanges="orientation|screenSize", quindi NON viene
+     * ricreata alla rotazione: senza questo il layout orizzontale resterebbe anche
+     * in verticale. Si stacca e si riattacca, cosi' Android rigonfia la risorsa
+     * giusta (res/layout-port oppure res/layout).
+     */
+    @Override
+    public void onConfigurationChanged(Configuration newConfig)
+    {
+        super.onConfigurationChanged(newConfig);
+
+        if (mLayout == null)
+            return;
+
+        try {
+            mGamepad.detach();
+            mGamepad.attachTo(this, mLayout);
+            if (mGamepadInvisible)
+                mGamepad.hideView();
+        } catch (Exception e) {
+            Log.w(TAG, "Rotazione: gamepad non riattaccato: " + e);
         }
     }
 
