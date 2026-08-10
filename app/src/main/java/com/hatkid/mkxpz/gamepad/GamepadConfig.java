@@ -87,6 +87,9 @@ public class GamepadConfig
     public final String labelX = "SU";
     public final String labelY = "GIU";
     public final String labelZ = "OGG";
-    public final String labelL = "L";
-    public final String labelR = "R";
+    // L e R sono il salvataggio rapido e la velocizzazione: sistemati in basso al
+    // centro come Select e Start, con la funzione scritta sopra invece della
+    // lettera, che non diceva niente.
+    public final String labelL = "SALVA";
+    public final String labelR = "SPEED";
 }
