@@ -1,63 +1,214 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Schermata di caricamento mostrata SOPRA la superficie di gioco.
+    Schermata iniziale + caricamento, mostrata SOPRA la superficie di gioco.
 
-    Perche' e' una View Android e non qualcosa disegnato dal gioco: nei primi ~80 s
+    Sta dentro MainActivity, non in un'activity separata, per un motivo preciso:
+    cosi' il gioco comincia a caricare NEL MOMENTO in cui l'app si apre, mentre
+    tu regoli i tasti. L'attesa e la configurazione avvengono insieme, invece che
+    una dopo l'altra.
+
+    Perche' e' una View Android e non qualcosa disegnato dal gioco: nei primi ~78 s
     mkxp-z non presenta nulla, e in quella fase non compare niente di disegnato dal
     gioco (verificato: nemmeno un rettangolo a z=999999). Le View Android invece si
     vedono, perche' non passano da quella presentazione.
-
-    Si tocca per nasconderla, oppure sparisce da sola (LOADING_OVERLAY_MS).
 -->
-<RelativeLayout
+<ScrollView
     xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/loading_overlay"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#0D0D14"
     android:clickable="true"
     android:focusable="true"
+    android:fillViewport="true"
 >
     <LinearLayout
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_centerInParent="true"
         android:orientation="vertical"
-        android:gravity="center"
-        android:padding="24dp"
+        android:padding="20dp"
     >
         <TextView
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/app_name"
             android:textColor="#F5F5F5"
             android:textSize="20sp"
             android:textStyle="bold"
-        />
-
-        <ProgressBar
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="18dp"
-            android:layout_marginBottom="18dp"
-            style="?android:attr/progressBarStyleLarge"
-        />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/loading_body"
-            android:textColor="#AAB0C4"
-            android:textSize="13sp"
             android:gravity="center"
         />
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp"
+        >
+            <ProgressBar
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="12dp"
+                style="?android:attr/progressBarStyleSmall"
+            />
+            <TextView
+                android:id="@+id/loading_state"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/loading_body"
+                android:textColor="#AAB0C4"
+                android:textSize="12sp"
+            />
+        </LinearLayout>
+
         <Button
             android:id="@+id/loading_skip"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="22dp"
-            android:text="@string/loading_skip"
+            android:text="@string/enter_game"
+            android:textSize="17sp"
+            android:paddingTop="12dp"
+            android:paddingBottom="12dp"
+        />
+
+        <!-- ===================== Tasti a schermo ===================== -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/controls"
+            android:textColor="#F5F5F5"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:paddingTop="18dp"
+        />
+
+        <TextView
+            android:id="@+id/label_opacity"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#DDE1EC"
+            android:textSize="12sp"
+        />
+
+        <SeekBar
+            android:id="@+id/seek_opacity"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="100"
+            android:min="20"
+            tools:ignore="UnusedAttribute"
+        />
+
+        <TextView
+            android:id="@+id/label_scale"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#DDE1EC"
+            android:textSize="12sp"
+        />
+
+        <SeekBar
+            android:id="@+id/seek_scale"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="160"
+            android:min="60"
+            tools:ignore="UnusedAttribute"
+        />
+
+        <!-- ===================== Orientamento ===================== -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/orientation"
+            android:textColor="#F5F5F5"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:paddingTop="14dp"
+        />
+
+        <RadioGroup
+            android:id="@+id/group_orient"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+        >
+            <RadioButton
+                android:id="@+id/orient_auto"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="@string/orient_auto_short"
+                android:textColor="#DDE1EC"
+                android:textSize="12sp"
+            />
+            <RadioButton
+                android:id="@+id/orient_land"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="@string/orient_land_short"
+                android:textColor="#DDE1EC"
+                android:textSize="12sp"
+            />
+            <RadioButton
+                android:id="@+id/orient_port"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="@string/orient_port_short"
+                android:textColor="#DDE1EC"
+                android:textSize="12sp"
+            />
+        </RadioGroup>
+
+        <!-- ===================== Lingua ===================== -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/language"
+            android:textColor="#F5F5F5"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:paddingTop="14dp"
+        />
+
+        <RadioGroup
+            android:id="@+id/group_lang"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+        >
+            <RadioButton
+                android:id="@+id/lang_it"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="@string/lang_it"
+                android:textColor="#DDE1EC"
+                android:textSize="12sp"
+            />
+            <RadioButton
+                android:id="@+id/lang_en"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="@string/lang_en"
+                android:textColor="#DDE1EC"
+                android:textSize="12sp"
+            />
+        </RadioGroup>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/language_notice_restart"
+            android:textColor="#7E859B"
+            android:textSize="11sp"
+            android:paddingTop="2dp"
+            android:paddingBottom="12dp"
         />
     </LinearLayout>
-</RelativeLayout>
+</ScrollView>

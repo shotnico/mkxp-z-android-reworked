@@ -3,33 +3,28 @@
     <!-- Main application name -->
     <string name="app_name">Pokémon Fire Ash ITA</string>
 
-    <!-- Schermata iniziale -->
-    <string name="play">GIOCA</string>
-    <string name="loading_notice">Il primo avvio richiede circa un minuto e mezzo: è normale.</string>
-
-    <string name="language">Lingua</string>
-    <string name="lang_it">Italiano</string>
-    <string name="lang_en">English</string>
-    <string name="language_notice">Cambiando lingua si scambiano le cartelle dei dati. I salvataggi non vengono toccati, ma conviene salvare prima di cambiare.</string>
-    <string name="lang_missing">Pacchetto della lingua non trovato sul telefono.</string>
+    <!-- Schermata iniziale / caricamento -->
+    <string name="enter_game">ENTRA NEL GIOCO</string>
+    <string name="loading_body">Caricamento in corso: circa un minuto e mezzo.\nIntanto puoi regolare i tasti qui sotto.</string>
+    <string name="loading_ready">Caricamento probabilmente finito: tocca ENTRA NEL GIOCO.</string>
 
     <string name="controls">Tasti a schermo</string>
     <string name="opacity_value">Opacità: %1$d%%</string>
     <string name="scale_value">Dimensione: %1$d%%</string>
 
     <string name="orientation">Orientamento</string>
-    <string name="orient_auto">Automatico</string>
-    <string name="orient_land">Solo orizzontale</string>
-    <string name="orient_port">Solo verticale (stile Game Boy)</string>
-    <string name="orient_notice">In verticale il gioco resta centrato e i tasti stanno nella banda in basso.</string>
+    <string name="orient_auto_short">Automatico</string>
+    <string name="orient_land_short">Orizzontale</string>
+    <string name="orient_port_short">Verticale</string>
+
+    <string name="language">Lingua</string>
+    <string name="lang_it">Italiano</string>
+    <string name="lang_en">English</string>
+    <string name="language_notice_restart">Il cambio lingua scambia le cartelle dei dati e richiede di riavviare l\'app. I salvataggi non vengono toccati.</string>
+    <string name="lang_missing">Pacchetto della lingua non trovato sul telefono.</string>
+    <string name="lang_switched">Lingua cambiata. Chiudi e riapri l\'app per applicarla.</string>
 
     <!-- Stato -->
-    <string name="status_no_permission">Serve il permesso «Accesso a tutti i file»: tocca GIOCA per concederlo.</string>
-    <string name="status_no_game">Cartella del gioco non trovata. Copiala in /FireAshITA oppure /mkxp-z nella memoria interna.</string>
-    <string name="status_ok">Gioco trovato in %1$s</string>
-
-    <!-- Schermata di caricamento sopra il gioco -->
-    <string name="loading_title">Caricamento…</string>
-    <string name="loading_body">Pokémon Fire Ash sta caricando i dati.\nAl primo avvio serve circa un minuto e mezzo.</string>
-    <string name="loading_skip">Nascondi</string>
+    <string name="status_no_permission">Serve il permesso «Accesso a tutti i file».</string>
+    <string name="status_no_game">Cartella del gioco non trovata in /FireAshITA né /mkxp-z.</string>
 </resources>

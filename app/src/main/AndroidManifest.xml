@@ -49,25 +49,14 @@
         android:allowBackup="true"
         android:requestLegacyExternalStorage="true"
     >
-        <!-- Schermata iniziale: e' questa che si apre dal launcher.
-             Copre l'attesa dell'avvio, regola i tasti e scambia la lingua. -->
-        <activity
-            android:name=".LauncherActivity"
-            android:label="@string/app_name"
-            android:screenOrientation="portrait"
-            android:exported="true"
-        >
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
-            </intent-filter>
-        </activity>
+        <!-- Unica activity: e' anche l'ingresso dal launcher.
+             La schermata iniziale e' una View sopra la superficie di gioco
+             (loading_overlay), non un'activity separata: cosi' il gioco comincia a
+             caricare nel momento in cui l'app si apre, mentre l'utente regola i
+             tasti. L'attesa e la configurazione avvengono insieme.
 
-        <!-- Main activity: avviata dalla schermata iniziale, non piu' dal launcher.
-             screenOrientation e' fullSensor perche' l'orientamento effettivo viene
-             deciso a runtime da applyOrientationPreference(); cosi' si evita il
-             lampo in orizzontale prima che la preferenza venga applicata. -->
+             screenOrientation e' fullSensor perche' l'orientamento effettivo lo
+             decide setOrientationBis() a runtime. -->
         <activity
             android:name=".MainActivity"
             android:label="@string/app_name"
@@ -80,6 +69,10 @@
             android:exported="true"
         >
             <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+
                 <!-- Let Android know that we can handle some USB devices and should receive this event -->
                 <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
             </intent-filter>

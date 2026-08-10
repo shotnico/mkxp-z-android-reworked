@@ -3,6 +3,12 @@ package com.hatkid.mkxpz;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
+import android.widget.SeekBar;
+import android.widget.TextView;
+import android.widget.Toast;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
@@ -44,7 +50,7 @@ public class MainActivity extends SDLActivity
     // Accettiamo anche la vecchia cartella "mkxp-z": chi ha gia' copiato il gioco
     // li' per provarlo con l'APK generico non deve rinominare 553 MB di file.
     // La risoluzione del percorso e lo scambio della lingua stanno in
-    // utils/GameFolder, condivisi con LauncherActivity.
+    // utils/GameFolder.
     //
     // ATTENZIONE: va risolto da runSDLThread(), NON da un inizializzatore statico:
     // prima che l'utente conceda "Accesso a tutti i file" ogni isDirectory() su
@@ -198,6 +204,44 @@ public class MainActivity extends SDLActivity
     }
 
     /**
+     * QUESTO E' IL MOTIVO PER CUI IL VERTICALE NON FUNZIONAVA.
+     *
+     * SDL, dopo aver creato la finestra, chiama setOrientation() dal lato nativo e
+     * impone lui l'orientamento, sovrascrivendo quello che aveva chiesto l'activity.
+     * Nel log si vedeva:
+     *
+     *     setOrientation() requestedOrientation=6 ... hint=LandscapeLeft LandscapeRight
+     *
+     * cioe' SCREEN_ORIENTATION_SENSOR_LANDSCAPE: mkxp-z dichiara a SDL un hint di
+     * sole orientazioni orizzontali (la finestra e' 512x384, piu' larga che alta), e
+     * il ramo "resizable con un solo orientamento permesso" di setOrientationBis
+     * forza l'orizzontale. La scelta dell'utente veniva quindi annullata pochi
+     * istanti dopo essere stata applicata.
+     *
+     * SDLActivity documenta questo metodo come sovrascrivibile ("This can be
+     * overridden"), quindi qui facciamo vincere la preferenza dell'utente.
+     */
+    @Override
+    public void setOrientationBis(int w, int h, boolean resizable, String hint)
+    {
+        int orient = getSharedPreferences(GamepadConfig.PREFS, MODE_PRIVATE)
+                        .getInt(GamepadConfig.KEY_ORIENTATION, GamepadConfig.ORIENT_AUTO);
+
+        if (orient == GamepadConfig.ORIENT_PORTRAIT) {
+            Log.i(TAG, "setOrientationBis: forzo il verticale su richiesta dell'utente");
+            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT);
+            return;
+        }
+        if (orient == GamepadConfig.ORIENT_LANDSCAPE) {
+            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+            return;
+        }
+        // Automatico: SDL qui imporrebbe comunque il solo orizzontale, per via
+        // dell'hint. Lasciamo entrambi gli orientamenti, cosi' ruotare funziona.
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);
+    }
+
+    /**
      * Schermata di caricamento sopra la superficie di gioco.
      *
      * Serve perche' l'avvio richiede ~85 s, di cui ~80 in cui mkxp-z non presenta
@@ -215,20 +259,131 @@ public class MainActivity extends SDLActivity
             mLoadingOverlay = getLayoutInflater().inflate(R.layout.loading_overlay, mLayout, false);
             mLayout.addView(mLoadingOverlay);   // aggiunta per ultima = sopra a tutto
 
-            View.OnClickListener dismiss = new View.OnClickListener() {
-                @Override public void onClick(View v) { hideLoadingOverlay(); }
-            };
-            mLoadingOverlay.setOnClickListener(dismiss);
-            View skip = mLoadingOverlay.findViewById(R.id.loading_skip);
-            if (skip != null)
-                skip.setOnClickListener(dismiss);
+            final SharedPreferences prefs = getSharedPreferences(GamepadConfig.PREFS, MODE_PRIVATE);
 
+            // --- ENTRA NEL GIOCO ---------------------------------------------
+            View enter = mLoadingOverlay.findViewById(R.id.loading_skip);
+            if (enter != null) {
+                enter.setOnClickListener(new View.OnClickListener() {
+                    @Override public void onClick(View v) { applySettingsAndEnter(); }
+                });
+            }
+
+            // --- opacita' e dimensione ---------------------------------------
+            final SeekBar op = mLoadingOverlay.findViewById(R.id.seek_opacity);
+            final SeekBar sc = mLoadingOverlay.findViewById(R.id.seek_scale);
+            op.setProgress(mGamepadConfig.opacity);
+            sc.setProgress(mGamepadConfig.scale);
+            updateOverlayLabels(op.getProgress(), sc.getProgress());
+
+            SeekBar.OnSeekBarChangeListener l = new SeekBar.OnSeekBarChangeListener() {
+                @Override public void onProgressChanged(SeekBar s, int v, boolean fromUser) {
+                    updateOverlayLabels(op.getProgress(), sc.getProgress());
+                }
+                @Override public void onStartTrackingTouch(SeekBar s) { }
+                @Override public void onStopTrackingTouch(SeekBar s) {
+                    // salva e riapplica subito: il gamepad viene ricostruito, cosi'
+                    // il risultato si vede senza riavviare
+                    prefs.edit().putInt(GamepadConfig.KEY_OPACITY, op.getProgress())
+                                .putInt(GamepadConfig.KEY_SCALE, sc.getProgress())
+                                .apply();
+                    reloadGamepad();
+                }
+            };
+            op.setOnSeekBarChangeListener(l);
+            sc.setOnSeekBarChangeListener(l);
+
+            // --- orientamento -------------------------------------------------
+            int orient = prefs.getInt(GamepadConfig.KEY_ORIENTATION, GamepadConfig.ORIENT_AUTO);
+            ((RadioButton) mLoadingOverlay.findViewById(
+                orient == GamepadConfig.ORIENT_LANDSCAPE ? R.id.orient_land
+              : orient == GamepadConfig.ORIENT_PORTRAIT  ? R.id.orient_port
+              : R.id.orient_auto)).setChecked(true);
+
+            ((RadioGroup) mLoadingOverlay.findViewById(R.id.group_orient))
+                .setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
+                    @Override public void onCheckedChanged(RadioGroup g, int id) {
+                        int o = (id == R.id.orient_land) ? GamepadConfig.ORIENT_LANDSCAPE
+                              : (id == R.id.orient_port) ? GamepadConfig.ORIENT_PORTRAIT
+                              : GamepadConfig.ORIENT_AUTO;
+                        prefs.edit().putInt(GamepadConfig.KEY_ORIENTATION, o).apply();
+                        applyOrientationPreference();
+                    }
+                });
+
+            // --- lingua -------------------------------------------------------
+            String lang = prefs.getString(GamepadConfig.KEY_LANGUAGE, GameFolder.LANG_IT);
+            ((RadioButton) mLoadingOverlay.findViewById(
+                GameFolder.LANG_EN.equals(lang) ? R.id.lang_en : R.id.lang_it)).setChecked(true);
+
+            ((RadioGroup) mLoadingOverlay.findViewById(R.id.group_lang))
+                .setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
+                    @Override public void onCheckedChanged(RadioGroup g, int id) {
+                        String cur = prefs.getString(GamepadConfig.KEY_LANGUAGE, GameFolder.LANG_IT);
+                        String want = (id == R.id.lang_en) ? GameFolder.LANG_EN : GameFolder.LANG_IT;
+                        if (want.equals(cur))
+                            return;
+                        // Il gioco sta gia' leggendo Data/: lo scambio vale dal
+                        // prossimo avvio, non da adesso.
+                        if (GameFolder.switchTo(cur, want)) {
+                            prefs.edit().putString(GamepadConfig.KEY_LANGUAGE, want).apply();
+                            Toast.makeText(MainActivity.this, R.string.lang_switched, Toast.LENGTH_LONG).show();
+                        } else {
+                            Toast.makeText(MainActivity.this, R.string.lang_missing, Toast.LENGTH_LONG).show();
+                            ((RadioButton) mLoadingOverlay.findViewById(
+                                GameFolder.LANG_EN.equals(cur) ? R.id.lang_en : R.id.lang_it)).setChecked(true);
+                        }
+                    }
+                });
+
+            // Passato il tempo tipico di caricamento, cambia il messaggio invece di
+            // far sparire tutto: chi sta ancora regolando i tasti non viene buttato
+            // dentro al gioco a tradimento.
             new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                @Override public void run() { hideLoadingOverlay(); }
+                @Override public void run() {
+                    TextView st = (mLoadingOverlay != null)
+                                ? (TextView) mLoadingOverlay.findViewById(R.id.loading_state) : null;
+                    if (st != null)
+                        st.setText(R.string.loading_ready);
+                }
             }, LOADING_OVERLAY_MS);
         } catch (Exception e) {
             Log.w(TAG, "Loading overlay non mostrata: " + e);
         }
+    }
+
+    private void updateOverlayLabels(int opacity, int scale)
+    {
+        if (mLoadingOverlay == null)
+            return;
+        TextView a = mLoadingOverlay.findViewById(R.id.label_opacity);
+        TextView b = mLoadingOverlay.findViewById(R.id.label_scale);
+        if (a != null) a.setText(getString(R.string.opacity_value, opacity));
+        if (b != null) b.setText(getString(R.string.scale_value, scale));
+    }
+
+    /** Ricostruisce i controlli a schermo con i valori salvati. */
+    private void reloadGamepad()
+    {
+        if (mLayout == null)
+            return;
+        try {
+            mGamepadConfig = GamepadConfig.load(this);
+            mGamepad.init(mGamepadConfig, mGamepadInvisible);
+            mGamepad.detach();
+            mGamepad.attachTo(this, mLayout);
+            // l'overlay deve restare sopra i controlli appena riattaccati
+            if (mLoadingOverlay != null)
+                mLoadingOverlay.bringToFront();
+        } catch (Exception e) {
+            Log.w(TAG, "Gamepad non ricostruito: " + e);
+        }
+    }
+
+    private void applySettingsAndEnter()
+    {
+        reloadGamepad();
+        hideLoadingOverlay();
     }
 
     private void hideLoadingOverlay()
