@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.widget.RadioButton;
+import android.widget.RelativeLayout;
 import android.widget.RadioGroup;
 import android.widget.SeekBar;
 import android.widget.TextView;
@@ -185,6 +186,7 @@ public class MainActivity extends SDLActivity
         mGamepad.setOnKeyUpListener(SDLActivity::onNativeKeyUp);
 
         if (mLayout != null) {
+            applySurfaceLayout();          // in verticale mette il gioco in alto
             mGamepad.attachTo(this, mLayout);
             showLoadingOverlay();
         }
@@ -239,6 +241,49 @@ public class MainActivity extends SDLActivity
         // Automatico: SDL qui imporrebbe comunque il solo orizzontale, per via
         // dell'hint. Lasciamo entrambi gli orientamenti, cosi' ruotare funziona.
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);
+    }
+
+    /**
+     * In verticale mette il gioco IN ALTO invece che centrato.
+     *
+     * mkxp-z con fixedAspectRatio tiene il 4:3 centrato nella superficie, quindi
+     * in verticale restavano due bande nere uguali sopra e sotto e il gioco stava
+     * in mezzo. Qui la superficie SDL viene ridotta a esattamente 4:3 della
+     * larghezza e ancorata in cima: il gioco la riempie tutta, sta in alto, e
+     * tutto lo spazio che resta finisce sotto, dove ci sono i comandi. Come un
+     * Game Boy.
+     *
+     * SDLActivity crea mLayout come RelativeLayout e vi aggiunge mSurface senza
+     * parametri espliciti, quindi possiamo imporli noi. Cambiare la dimensione
+     * della superficie provoca un surfaceChanged, che SDL e mkxp-z gestiscono da
+     * soli: essendo la superficie gia' 4:3, non c'e' piu' niente da centrare.
+     *
+     * In orizzontale si torna a schermo pieno.
+     */
+    private void applySurfaceLayout()
+    {
+        if (mLayout == null || mSurface == null)
+            return;
+
+        try {
+            boolean verticale = getResources().getConfiguration().orientation
+                                == Configuration.ORIENTATION_PORTRAIT;
+
+            RelativeLayout.LayoutParams p;
+            if (verticale) {
+                int w = getResources().getDisplayMetrics().widthPixels;
+                p = new RelativeLayout.LayoutParams(
+                        RelativeLayout.LayoutParams.MATCH_PARENT, w * 3 / 4);
+                p.addRule(RelativeLayout.ALIGN_PARENT_TOP);
+            } else {
+                p = new RelativeLayout.LayoutParams(
+                        RelativeLayout.LayoutParams.MATCH_PARENT,
+                        RelativeLayout.LayoutParams.MATCH_PARENT);
+            }
+            mSurface.setLayoutParams(p);
+        } catch (Exception e) {
+            Log.w(TAG, "Layout della superficie non applicato: " + e);
+        }
     }
 
     /**
@@ -308,6 +353,11 @@ public class MainActivity extends SDLActivity
                               : GamepadConfig.ORIENT_AUTO;
                         prefs.edit().putInt(GamepadConfig.KEY_ORIENTATION, o).apply();
                         applyOrientationPreference();
+                        // la rotazione effettiva arriva poco dopo: riapplichiamo
+                        // il layout della superficie quando e' avvenuta
+                        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                            @Override public void run() { applySurfaceLayout(); }
+                        }, 600);
                     }
                 });
 
@@ -412,6 +462,7 @@ public class MainActivity extends SDLActivity
             return;
 
         try {
+            applySurfaceLayout();          // la superficie va rimessa a posto per il nuovo orientamento
             mGamepad.detach();
             mGamepad.attachTo(this, mLayout);
             if (mGamepadInvisible)
