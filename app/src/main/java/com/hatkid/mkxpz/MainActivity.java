@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.widget.ImageView;
 import android.widget.RadioButton;
 import android.widget.RelativeLayout;
 import android.widget.RadioGroup;
@@ -71,17 +72,17 @@ public class MainActivity extends SDLActivity
     private GamepadConfig mGamepadConfig;
     private boolean mGamepadInvisible = false;
 
-    // Schermata di caricamento sopra la superficie di gioco
-    // Quando cambiare il messaggio in "il gioco e' pronto". Era 95 s, tarato su
-    // un avvio che ne richiedeva ~85: adesso il titolo compare in circa 3,5 s
-    // (pathCache spento), quindi il vecchio valore avrebbe lasciato a schermo un
-    // messaggio falso per un minuto e mezzo.
-    private static final long LOADING_OVERLAY_MS = 6000;
-    private View mLoadingOverlay;
+    // Pannello delle impostazioni, aperto in gioco dal tasto con l'ingranaggio.
+    // Non c'e' piu' una schermata di attesa all'avvio: serviva quando il gioco
+    // impiegava oltre un minuto a partire, adesso e' pronto in pochi secondi.
+    private View mPannello;
+    private ImageView mBottoneImpostazioni;
 
-    // Schermata iniziale (schermata_iniziale.png): quanto resta a schermo prima
-    // di lasciare il posto alle impostazioni. Non aggiunge attesa: il gioco sta
-    // caricando sotto per tutto questo tempo.
+    // Schermata iniziale: quanto resta a schermo. Non aggiunge attesa, il gioco
+    // sta caricando sotto per tutto questo tempo.
+    // L'immagine e' @drawable/schermata_iniziale e ne esistono DUE versioni,
+    // scelte da Android in base all'orientamento: quella verticale in
+    // res/drawable-nodpi/ e quella orizzontale in res/drawable-land-nodpi/.
     private static final long SPLASH_MS = 4500;
     private static final long SPLASH_FADE_MS = 600;
     private View mSplash;
@@ -197,9 +198,9 @@ public class MainActivity extends SDLActivity
             }
         }
 
-        // Orientamento scelto nella schermata iniziale. In verticale mkxp-z tiene
-        // il gioco 4:3 centrato e i tasti stanno nella banda bassa (stile Game Boy):
-        // vedi res/layout-port/gamepad_layout.xml.
+        // L'app segue SEMPRE il telefono: girarlo passa in verticale, rimetterlo
+        // di lato torna orizzontale. Vedi applyOrientationPreference per il
+        // motivo per cui la scelta manuale e' stata rimossa.
         applyOrientationPreference();
 
         // Setup in-screen gamepad
@@ -215,11 +216,51 @@ public class MainActivity extends SDLActivity
         if (mLayout != null) {
             applySurfaceLayout();          // in verticale mette il gioco in alto
             mGamepad.attachTo(this, mLayout);
-            showLoadingOverlay();
-            // La schermata iniziale va aggiunta DOPO l'overlay, cosi' resta lei
-            // davanti per i primi secondi. L'ordine dei figli e' l'ordine di
-            // disegno: l'ultimo aggiunto sta sopra.
+            // Il tasto dell'ingranaggio resta a schermo per tutta la partita: le
+            // impostazioni si aprono da li'. Aggiunto prima della schermata
+            // iniziale, che deve stare davanti a tutto nei primi secondi.
+            addPulsanteImpostazioni();
             showSplash();
+        }
+    }
+
+    /**
+     * Tasto con l'ingranaggio in alto a sinistra: apre le impostazioni in gioco.
+     *
+     * Perche' esiste. Prima le impostazioni erano una schermata all'avvio, e
+     * aveva senso finche' il gioco impiegava oltre un minuto a partire: quel
+     * tempo andava occupato. Ora il gioco e' pronto in pochi secondi, quindi una
+     * schermata di attesa non serve piu' e le impostazioni stanno dove le vuoi
+     * davvero, cioe' mentre giochi.
+     *
+     * E' piccolo e semitrasparente per non dare fastidio: sopra c'e' la scena del
+     * gioco. Il cerchio scuro dell'icona serve a renderlo visibile su qualsiasi
+     * sfondo.
+     */
+    private void addPulsanteImpostazioni()
+    {
+        try {
+            mBottoneImpostazioni = new ImageView(this);
+            mBottoneImpostazioni.setImageResource(R.drawable.ic_ingranaggio);
+            mBottoneImpostazioni.setContentDescription(getString(R.string.settings_open));
+            mBottoneImpostazioni.setAlpha(0.55f);
+
+            int lato = Math.round(getResources().getDisplayMetrics().density * 34);
+            int bordo = Math.round(getResources().getDisplayMetrics().density * 6);
+            RelativeLayout.LayoutParams p =
+                    new RelativeLayout.LayoutParams(lato, lato);
+            p.addRule(RelativeLayout.ALIGN_PARENT_TOP);
+            p.addRule(RelativeLayout.ALIGN_PARENT_START);
+            p.setMargins(bordo, bordo, 0, 0);
+            mBottoneImpostazioni.setLayoutParams(p);
+
+            mBottoneImpostazioni.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) { showSettingsPanel(); }
+            });
+
+            mLayout.addView(mBottoneImpostazioni);
+        } catch (Exception e) {
+            Log.w(TAG, "Tasto impostazioni non aggiunto: " + e);
         }
     }
 
@@ -267,76 +308,52 @@ public class MainActivity extends SDLActivity
     }
 
     /**
-     * L'orientamento richiesto, secondo la preferenza salvata.
+     * L'app segue sempre il telefono. Niente scelta manuale.
      *
-     * Si usano le costanti FISSE (PORTRAIT / LANDSCAPE) e non quelle SENSOR_*:
-     * le varianti col sensore ammettono entrambi i versi e ogni capovolgimento
-     * produce un cambio di configurazione in piu', cioe' un'altra distruzione e
-     * ricreazione della superficie di disegno. Meno cambi, meno occasioni di
-     * perdere la superficie mentre SDL la sta creando.
-     */
-    private int orientamentoRichiesto()
-    {
-        int orient = getSharedPreferences(GamepadConfig.PREFS, MODE_PRIVATE)
-                        .getInt(GamepadConfig.KEY_ORIENTATION, GamepadConfig.ORIENT_AUTO);
-
-        if (orient == GamepadConfig.ORIENT_LANDSCAPE)
-            return ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE;
-        if (orient == GamepadConfig.ORIENT_PORTRAIT)
-            return ActivityInfo.SCREEN_ORIENTATION_PORTRAIT;
-        return ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR;
-    }
-
-    /**
-     * Imposta l'orientamento SOLO se e' diverso da quello gia' richiesto.
+     * PERCHE' LA SCELTA E' STATA RIMOSSA. C'era una voce Orientamento con
+     * Automatico / Orizzontale / Verticale. Con "Verticale" il gioco NON PARTIVA
+     * AFFATTO: nel log comparivano "surface is not valid" e "skip updating
+     * surface, 5", il thread nativo non veniva mai avviato, e il layer della
+     * finestra restava 2340x1080 (orizzontale) nonostante la richiesta di
+     * verticale. Misurato: con Automatico Ruby parte in 1,1 s, con Verticale non
+     * parte mai, nemmeno entro 110 secondi.
      *
-     * QUESTO E' IL PUNTO DELICATO. Con la preferenza su "Verticale" il gioco non
-     * partiva affatto: nel log comparivano "surface is not valid" e "skip
-     * updating surface", e il thread nativo non veniva mai avviato perche' la
-     * superficie non diventava valida. Il layer della finestra risultava ancora
-     * 2340x1080, cioe' orizzontale, nonostante la richiesta di verticale.
+     * Verificato che non dipendeva da pathCache, ne' dalla rotazione fisica del
+     * telefono, ne' dalle modifiche recenti (anche l'APK precedente lo faceva).
+     * Un tentativo di correzione -- evitare di riscrivere l'orientamento quando
+     * era gia' quello giusto -- non ha risolto.
      *
-     * La causa e' la ripetizione: setRequestedOrientation veniva chiamato a ogni
-     * richiesta di SDL, anche quando il valore era gia' quello giusto. Ogni
-     * chiamata puo' innescare un cambio di configurazione, che distrugge e
-     * ricrea la superficie; se accade mentre SDL la sta creando, SDL resta in
-     * attesa di una superficie che viene continuamente rifatta.
+     * Chiedere a SDL un orientamento diverso da quello che ha gia' negoziato con
+     * la finestra e' fragile, e non serve: con FULL_SENSOR basta girare il
+     * telefono. In verticale il gioco va in alto (applySurfaceLayout) e i tasti
+     * restano in basso, che era l'effetto voluto.
      *
-     * Con orientamento "Automatico" il problema non si vedeva perche' la
-     * richiesta coincide con lo stato del sistema e non cambia nulla: misurato,
-     * Ruby partiva in 1,1 s in automatico e non partiva mai in verticale.
+     * FULL_SENSOR e' comunque necessario esplicitamente: mkxp-z dichiara a SDL
+     * una finestra 512x384, piu' larga che alta, e SDL da solo bloccherebbe il
+     * solo orizzontale.
      */
     private void applyOrientationPreference()
     {
-        int voluto = orientamentoRichiesto();
-        if (getRequestedOrientation() != voluto)
-            setRequestedOrientation(voluto);
+        if (getRequestedOrientation() != ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR)
+            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);
     }
 
     /**
-     * QUESTO E' IL MOTIVO PER CUI IL VERTICALE NON FUNZIONAVA.
-     *
-     * SDL, dopo aver creato la finestra, chiama setOrientation() dal lato nativo e
-     * impone lui l'orientamento, sovrascrivendo quello che aveva chiesto l'activity.
-     * Nel log si vedeva:
+     * SDL, dopo aver creato la finestra, chiama questo metodo dal lato nativo e
+     * imporrebbe lui l'orientamento. Nel log si vedeva:
      *
      *     setOrientation() requestedOrientation=6 ... hint=LandscapeLeft LandscapeRight
      *
-     * cioe' SCREEN_ORIENTATION_SENSOR_LANDSCAPE: mkxp-z dichiara a SDL un hint di
-     * sole orientazioni orizzontali (la finestra e' 512x384, piu' larga che alta), e
-     * il ramo "resizable con un solo orientamento permesso" di setOrientationBis
-     * forza l'orizzontale. La scelta dell'utente veniva quindi annullata pochi
-     * istanti dopo essere stata applicata.
+     * cioe' il solo orizzontale: mkxp-z dichiara a SDL una finestra 512x384, piu'
+     * larga che alta, e SDL ne deduce che il gioco sia solo orizzontale. Senza
+     * questa sovrascrittura, girare il telefono non avrebbe effetto.
      *
-     * SDLActivity documenta questo metodo come sovrascrivibile ("This can be
-     * overridden"), quindi qui facciamo vincere la preferenza dell'utente.
+     * SDLActivity documenta il metodo come sovrascrivibile ("This can be
+     * overridden"). Qui si lascia libero l'orientamento e decide il telefono.
      */
     @Override
     public void setOrientationBis(int w, int h, boolean resizable, String hint)
     {
-        // Passa da applyOrientationPreference, che NON riscrive l'orientamento
-        // se e' gia' quello giusto: vedi il commento la', e' il motivo per cui
-        // il verticale non partiva.
         applyOrientationPreference();
     }
 
@@ -388,16 +405,17 @@ public class MainActivity extends SDLActivity
      *
      * Il pannello copriva tutto lo schermo, quindi regolare l'opacita' era un
      * atto di fede: il valore cambiava davvero, ma nascosto sotto il pannello.
-     * Ora il pannello occupa solo la zona del gioco e i tasti restano fuori:
+     * Ora i tasti restano fuori e fanno da anteprima:
      *
-     *   verticale   -> la fascia ALTA, esattamente quanto la superficie di gioco
-     *                  (larghezza x 3/4). I tasti sono nella fascia bassa, liberi.
-     *   orizzontale -> una colonna centrale al 60% della larghezza. I tasti stanno
+     *   verticale   -> il pannello prende il 72% dell'altezza dall'alto e lascia
+     *                  libera la fascia bassa, dove stanno i tasti (misurati fra
+     *                  y=1697 e y=2178 su uno schermo di 2340).
+     *   orizzontale -> una colonna centrale al 50% della larghezza. I tasti stanno
      *                  ai due lati, quindi restano scoperti.
      */
-    private void applyOverlayLayout()
+    private void applyPanelLayout()
     {
-        if (mLayout == null || mLoadingOverlay == null)
+        if (mLayout == null || mPannello == null)
             return;
 
         try {
@@ -418,56 +436,52 @@ public class MainActivity extends SDLActivity
                         RelativeLayout.LayoutParams.MATCH_PARENT);
                 p.addRule(RelativeLayout.CENTER_HORIZONTAL);
             }
-            mLoadingOverlay.setLayoutParams(p);
+            mPannello.setLayoutParams(p);
         } catch (Exception e) {
             Log.w(TAG, "Layout del pannello impostazioni non applicato: " + e);
         }
     }
 
     /**
-     * Schermata di caricamento sopra la superficie di gioco.
+     * Apre le impostazioni durante la partita, dal tasto con l'ingranaggio.
      *
-     * Serve perche' l'avvio richiede ~85 s, di cui ~80 in cui mkxp-z non presenta
-     * ancora nulla: misurato che in quella fase non compare NIENTE, nemmeno un
-     * rettangolo disegnato dal gioco a z=999999. Le View Android invece si vedono,
-     * perche' non passano dalla presentazione di mkxp-z -- e' l'unico modo di
-     * mostrare qualcosa durante l'attesa.
-     *
-     * Non sappiamo dall'esterno quando il gioco inizia a presentare, quindi la
-     * schermata si toglie al tocco oppure da sola dopo il tempo tipico.
+     * Il gioco NON viene messo in pausa: continua a girare dietro al pannello.
+     * Quello che viene sospeso e' l'invio dei tasti, cosi' regolare l'opacita' non
+     * fa camminare il personaggio.
      */
-    private void showLoadingOverlay()
+    private void showSettingsPanel()
     {
+        if (mPannello != null)        // gia' aperto
+            return;
         try {
-            mLoadingOverlay = getLayoutInflater().inflate(R.layout.loading_overlay, mLayout, false);
-            mLayout.addView(mLoadingOverlay);   // aggiunta per ultima = sopra a tutto
-            applyOverlayLayout();               // non copre i tasti: sono l'anteprima
+            mPannello = getLayoutInflater().inflate(R.layout.settings_panel, mLayout, false);
+            mLayout.addView(mPannello);   // aggiunta per ultima = sopra a tutto
+            applyPanelLayout();                 // non copre i tasti: sono l'anteprima
 
             // I tasti si vedono e reagiscono al tocco, ma non arrivano al gioco:
-            // il gioco sta caricando e un tocco a caso sulla schermata del titolo
-            // potrebbe far partire una partita.
+            // altrimenti mentre regoli i cursori il personaggio si muoverebbe.
             mGamepad.setInputEnabled(false);
 
             final SharedPreferences prefs = getSharedPreferences(GamepadConfig.PREFS, MODE_PRIVATE);
 
-            // --- ENTRA NEL GIOCO ---------------------------------------------
-            View enter = mLoadingOverlay.findViewById(R.id.loading_skip);
-            if (enter != null) {
-                enter.setOnClickListener(new View.OnClickListener() {
-                    @Override public void onClick(View v) { applySettingsAndEnter(); }
+            // --- TORNA AL GIOCO ----------------------------------------------
+            View chiudi = mPannello.findViewById(R.id.settings_close);
+            if (chiudi != null) {
+                chiudi.setOnClickListener(new View.OnClickListener() {
+                    @Override public void onClick(View v) { closeSettingsPanel(); }
                 });
             }
 
             // --- opacita' e dimensione ---------------------------------------
-            final SeekBar op = mLoadingOverlay.findViewById(R.id.seek_opacity);
-            final SeekBar sc = mLoadingOverlay.findViewById(R.id.seek_scale);
+            final SeekBar op = mPannello.findViewById(R.id.seek_opacity);
+            final SeekBar sc = mPannello.findViewById(R.id.seek_scale);
             op.setProgress(mGamepadConfig.opacity);
             sc.setProgress(mGamepadConfig.scale);
-            updateOverlayLabels(op.getProgress(), sc.getProgress());
+            updatePanelLabels(op.getProgress(), sc.getProgress());
 
             SeekBar.OnSeekBarChangeListener l = new SeekBar.OnSeekBarChangeListener() {
                 @Override public void onProgressChanged(SeekBar s, int v, boolean fromUser) {
-                    updateOverlayLabels(op.getProgress(), sc.getProgress());
+                    updatePanelLabels(op.getProgress(), sc.getProgress());
                     // ANTEPRIMA IN DIRETTA dell'opacita': si vede sui tasti veri,
                     // che il pannello lascia scoperti, mentre si trascina.
                     //
@@ -494,35 +508,15 @@ public class MainActivity extends SDLActivity
             op.setOnSeekBarChangeListener(l);
             sc.setOnSeekBarChangeListener(l);
 
-            // --- orientamento -------------------------------------------------
-            int orient = prefs.getInt(GamepadConfig.KEY_ORIENTATION, GamepadConfig.ORIENT_AUTO);
-            ((RadioButton) mLoadingOverlay.findViewById(
-                orient == GamepadConfig.ORIENT_LANDSCAPE ? R.id.orient_land
-              : orient == GamepadConfig.ORIENT_PORTRAIT  ? R.id.orient_port
-              : R.id.orient_auto)).setChecked(true);
-
-            ((RadioGroup) mLoadingOverlay.findViewById(R.id.group_orient))
-                .setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
-                    @Override public void onCheckedChanged(RadioGroup g, int id) {
-                        int o = (id == R.id.orient_land) ? GamepadConfig.ORIENT_LANDSCAPE
-                              : (id == R.id.orient_port) ? GamepadConfig.ORIENT_PORTRAIT
-                              : GamepadConfig.ORIENT_AUTO;
-                        prefs.edit().putInt(GamepadConfig.KEY_ORIENTATION, o).apply();
-                        applyOrientationPreference();
-                        // la rotazione effettiva arriva poco dopo: riapplichiamo
-                        // il layout della superficie quando e' avvenuta
-                        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                            @Override public void run() { applySurfaceLayout(); }
-                        }, 600);
-                    }
-                });
+            // Niente scelta dell'orientamento: l'app segue il telefono.
+            // Vedi applyOrientationPreference per il perche'.
 
             // --- lingua -------------------------------------------------------
             String lang = prefs.getString(GamepadConfig.KEY_LANGUAGE, GameFolder.LANG_IT);
-            ((RadioButton) mLoadingOverlay.findViewById(
+            ((RadioButton) mPannello.findViewById(
                 GameFolder.LANG_EN.equals(lang) ? R.id.lang_en : R.id.lang_it)).setChecked(true);
 
-            ((RadioGroup) mLoadingOverlay.findViewById(R.id.group_lang))
+            ((RadioGroup) mPannello.findViewById(R.id.group_lang))
                 .setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
                     @Override public void onCheckedChanged(RadioGroup g, int id) {
                         String cur = prefs.getString(GamepadConfig.KEY_LANGUAGE, GameFolder.LANG_IT);
@@ -536,34 +530,23 @@ public class MainActivity extends SDLActivity
                             Toast.makeText(MainActivity.this, R.string.lang_switched, Toast.LENGTH_LONG).show();
                         } else {
                             Toast.makeText(MainActivity.this, R.string.lang_missing, Toast.LENGTH_LONG).show();
-                            ((RadioButton) mLoadingOverlay.findViewById(
+                            ((RadioButton) mPannello.findViewById(
                                 GameFolder.LANG_EN.equals(cur) ? R.id.lang_en : R.id.lang_it)).setChecked(true);
                         }
                     }
                 });
 
-            // Passato il tempo tipico di caricamento, cambia il messaggio invece di
-            // far sparire tutto: chi sta ancora regolando i tasti non viene buttato
-            // dentro al gioco a tradimento.
-            new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                @Override public void run() {
-                    TextView st = (mLoadingOverlay != null)
-                                ? (TextView) mLoadingOverlay.findViewById(R.id.loading_state) : null;
-                    if (st != null)
-                        st.setText(R.string.loading_ready);
-                }
-            }, LOADING_OVERLAY_MS);
         } catch (Exception e) {
-            Log.w(TAG, "Loading overlay non mostrata: " + e);
+            Log.w(TAG, "Pannello impostazioni non mostrato: " + e);
         }
     }
 
-    private void updateOverlayLabels(int opacity, int scale)
+    private void updatePanelLabels(int opacity, int scale)
     {
-        if (mLoadingOverlay == null)
+        if (mPannello == null)
             return;
-        TextView a = mLoadingOverlay.findViewById(R.id.label_opacity);
-        TextView b = mLoadingOverlay.findViewById(R.id.label_scale);
+        TextView a = mPannello.findViewById(R.id.label_opacity);
+        TextView b = mPannello.findViewById(R.id.label_scale);
         if (a != null) a.setText(getString(R.string.opacity_value, opacity));
         if (b != null) b.setText(getString(R.string.scale_value, scale));
     }
@@ -581,32 +564,42 @@ public class MainActivity extends SDLActivity
             // attachTo ricostruisce i tasti da zero, quindi il blocco dell'input
             // va rimesso: senza questo, muovere il cursore della dimensione
             // riabilitava i tasti mentre le impostazioni erano ancora aperte.
-            mGamepad.setInputEnabled(mLoadingOverlay == null);
-            // l'overlay deve restare sopra i controlli appena riattaccati
-            if (mLoadingOverlay != null)
-                mLoadingOverlay.bringToFront();
-            if (mSplash != null)
-                mSplash.bringToFront();
+            mGamepad.setInputEnabled(mPannello == null);
+            // Riattaccare il gamepad lo rende l'ultimo figlio, quindi il piu' in
+            // alto: tutto quello che deve stargli sopra va riportato davanti,
+            // nell'ordine in cui deve apparire.
+            portaDavantiSovrapposizioni();
         } catch (Exception e) {
             Log.w(TAG, "Gamepad non ricostruito: " + e);
         }
     }
 
-    private void applySettingsAndEnter()
+    /** Rimette in cima ingranaggio, pannello e schermata iniziale, in quest'ordine. */
+    private void portaDavantiSovrapposizioni()
     {
-        reloadGamepad();
-        hideLoadingOverlay();
+        if (mBottoneImpostazioni != null)
+            mBottoneImpostazioni.bringToFront();
+        if (mPannello != null)
+            mPannello.bringToFront();
+        if (mSplash != null)
+            mSplash.bringToFront();
     }
 
-    private void hideLoadingOverlay()
+    private void closeSettingsPanel()
     {
-        if (mLoadingOverlay == null)
+        reloadGamepad();
+        hideSettingsPanel();
+    }
+
+    private void hideSettingsPanel()
+    {
+        if (mPannello == null)
             return;
 
-        if (mLoadingOverlay.getParent() instanceof ViewGroup)
-            ((ViewGroup) mLoadingOverlay.getParent()).removeView(mLoadingOverlay);
+        if (mPannello.getParent() instanceof ViewGroup)
+            ((ViewGroup) mPannello.getParent()).removeView(mPannello);
 
-        mLoadingOverlay = null;
+        mPannello = null;
 
         // da qui i tasti comandano il gioco
         mGamepad.setInputEnabled(true);
@@ -628,19 +621,16 @@ public class MainActivity extends SDLActivity
 
         try {
             applySurfaceLayout();          // la superficie va rimessa a posto per il nuovo orientamento
-            applyOverlayLayout();          // e anche il pannello: cambia zona e misura
+            applyPanelLayout();            // e anche il pannello: cambia zona e misura
             mGamepad.detach();
             mGamepad.attachTo(this, mLayout);
-            mGamepad.setInputEnabled(mLoadingOverlay == null);
+            mGamepad.setInputEnabled(mPannello == null);
             if (mGamepadInvisible)
                 mGamepad.hideView();
             // Riattaccare il gamepad lo rimette come ultimo figlio, quindi sopra
-            // all'overlay: dopo una rotazione i tasti finivano disegnati sopra le
-            // impostazioni. L'overlay va riportato davanti.
-            if (mLoadingOverlay != null)
-                mLoadingOverlay.bringToFront();
-            if (mSplash != null)
-                mSplash.bringToFront();
+            // a tutto: dopo una rotazione i tasti finivano disegnati sopra le
+            // impostazioni. Va ripristinato l'ordine di sovrapposizione.
+            portaDavantiSovrapposizioni();
         } catch (Exception e) {
             Log.w(TAG, "Rotazione: gamepad non riattaccato: " + e);
         }

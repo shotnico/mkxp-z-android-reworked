@@ -13,18 +13,22 @@ import android.view.KeyEvent;
  */
 public class GamepadConfig
 {
-    /** Nome del file di preferenze, condiviso con la schermata iniziale. */
+    /** Nome del file di preferenze, condiviso con il pannello impostazioni. */
     public static final String PREFS = "fireash";
 
-    public static final String KEY_OPACITY     = "gamepad_opacity";
-    public static final String KEY_SCALE       = "gamepad_scale";
-    public static final String KEY_ORIENTATION = "orientation";
-    public static final String KEY_LANGUAGE    = "language";
+    public static final String KEY_OPACITY  = "gamepad_opacity";
+    public static final String KEY_SCALE    = "gamepad_scale";
+    public static final String KEY_LANGUAGE = "language";
 
-    /** Orientamento: 0 = automatico, 1 = solo orizzontale, 2 = solo verticale. */
-    public static final int ORIENT_AUTO      = 0;
-    public static final int ORIENT_LANDSCAPE = 1;
-    public static final int ORIENT_PORTRAIT  = 2;
+    // La preferenza "orientation" NON esiste piu' e non viene piu' letta.
+    // C'era una scelta Automatico / Orizzontale / Verticale, ma imporre
+    // l'orientamento con setRequestedOrientation impediva alla superficie di
+    // disegno di stabilizzarsi: con "Verticale" il gioco non partiva affatto
+    // (misurato: Ruby non parte nemmeno entro 110 secondi, mentre in automatico
+    // parte in 1,1 s). Ora l'app segue sempre il telefono. Vedi
+    // MainActivity.applyOrientationPreference.
+    //
+    // Un valore vecchio rimasto nelle preferenze e' innocuo: nessuno lo legge.
 
     // Opacita' in percentuale. ViewUtils.changeOpacity la mappa su 0-255, quindi
     // il 45 originale dava 115 su 255: i tasti sparivano con un po' di luce.

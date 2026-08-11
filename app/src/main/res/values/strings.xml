@@ -3,25 +3,20 @@
     <!-- Main application name -->
     <string name="app_name">Pokémon Fire Ash ITA</string>
 
-    <!-- Schermata iniziale / caricamento -->
-    <string name="enter_game">ENTRA NEL GIOCO</string>
-    <!-- Prima diceva "circa un minuto e mezzo": era vero finche' pathCache
-         scandiva 22.253 file a ogni avvio. Ora il gioco arriva alla schermata
-         del titolo in circa 3 secondi e mezzo, quindi il testo va detto giusto. -->
-    <string name="loading_body">Il gioco è pronto in pochi secondi.\nIntanto puoi regolare i tasti qui sotto.</string>
-    <string name="loading_ready">Il gioco è pronto: tocca ENTRA NEL GIOCO.</string>
-
+    <!-- Schermata iniziale -->
     <string name="splash_hint">Caricamento in corso…</string>
+
+    <!-- Impostazioni, aperte in gioco dal tasto con l'ingranaggio -->
+    <string name="settings_title">Impostazioni</string>
+    <string name="settings_open">Impostazioni</string>
+    <string name="back_to_game">TORNA AL GIOCO</string>
 
     <string name="controls">Tasti a schermo</string>
     <string name="controls_preview">I tasti veri sono visibili qui fuori: cambiano mentre regoli. Puoi premerli per provarli, non vanno al gioco.</string>
     <string name="opacity_value">Opacità: %1$d%%</string>
     <string name="scale_value">Dimensione: %1$d%% (si applica quando lasci il cursore)</string>
 
-    <string name="orientation">Orientamento</string>
-    <string name="orient_auto_short">Automatico</string>
-    <string name="orient_land_short">Orizzontale</string>
-    <string name="orient_port_short">Verticale</string>
+    <string name="orientation_note">L\'app segue sempre il telefono: giralo e passa in verticale, rimettilo di lato e torna orizzontale.</string>
 
     <string name="language">Lingua</string>
     <string name="lang_it">Italiano</string>
