@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Schermata iniziale mostrata per qualche secondo appena si apre l'app.
+
+    A cosa serve: l'avvio richiede circa un minuto e mezzo, di cui la prima parte
+    e' tempo in cui mkxp-z non presenta ancora nulla. Questa immagine copre quei
+    secondi con qualcosa da guardare, mentre SOTTO il gioco sta gia' caricando:
+    non aggiunge attesa, la occupa.
+
+    Perche' funziona: e' una View Android, quindi si disegna subito e non passa
+    dalla presentazione di mkxp-z, che in quella fase non mostra niente.
+
+    L'immagine e' 941x1672, cioe' verticale. scaleType="fitCenter" la mostra
+    intera senza tagliarla: in verticale riempie quasi tutto, in orizzontale
+    resta al centro con due bande nere ai lati. Preferito a centerCrop perche'
+    tagliare una schermata di titolo significa perderne il titolo.
+-->
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/splash_screen"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000"
+    android:clickable="true"
+    android:focusable="true"
+>
+    <ImageView
+        android:id="@+id/splash_image"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitCenter"
+        android:src="@drawable/schermata_iniziale"
+        android:contentDescription="@string/app_name"
+    />
+
+    <TextView
+        android:id="@+id/splash_hint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:gravity="center"
+        android:paddingBottom="18dp"
+        android:text="@string/splash_hint"
+        android:textColor="#CFD6E4"
+        android:textSize="12sp"
+        android:shadowColor="#000000"
+        android:shadowRadius="6"
+    />
+</FrameLayout>

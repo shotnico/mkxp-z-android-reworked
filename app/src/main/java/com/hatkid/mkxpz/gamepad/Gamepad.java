@@ -18,6 +18,13 @@ public class Gamepad
     private GamepadConfig mGamepadConfig = null;
     private boolean mInvisible = false;
 
+    // Quando le impostazioni sono aperte i tasti restano VISIBILI (servono da
+    // anteprima: si vede l'opacita' che si sta regolando e si prova la posizione
+    // col pollice) ma non devono arrivare al gioco, che intanto sta caricando e
+    // potrebbe essere sulla schermata del titolo. La pressione si vede comunque,
+    // perche' l'animazione del tasto e' indipendente dall'invio del tasto.
+    private boolean mInputEnabled = true;
+
     private OnKeyDownListener mOnKeyDownListener = key -> {};
     private OnKeyUpListener mOnKeyUpListener = key -> {};
 
@@ -86,8 +93,8 @@ public class Gamepad
 
         // Setup in-screen gamepad listeners
         mGamepadLayout.setOnTouchListener((view, motionEvent) -> false);
-        gpadDPad.setOnKeyDownListener(key -> mOnKeyDownListener.onKeyDown(key));
-        gpadDPad.setOnKeyUpListener(key -> mOnKeyUpListener.onKeyUp(key));
+        gpadDPad.setOnKeyDownListener(key -> { if (mInputEnabled) mOnKeyDownListener.onKeyDown(key); });
+        gpadDPad.setOnKeyUpListener(key -> { if (mInputEnabled) mOnKeyUpListener.onKeyUp(key); });
 
         // Configure gamepad
         gpadDPad.isDiagonal = mGamepadConfig.diagonalMovement;
@@ -117,8 +124,36 @@ public class Gamepad
         // Set gamepad button
         gpadBtn.setForegroundText(btnLabel);
         gpadBtn.setKey(keycode);
-        gpadBtn.setOnKeyDownListener(key -> mOnKeyDownListener.onKeyDown(key));
-        gpadBtn.setOnKeyUpListener(key -> mOnKeyUpListener.onKeyUp(key));
+        gpadBtn.setOnKeyDownListener(key -> { if (mInputEnabled) mOnKeyDownListener.onKeyDown(key); });
+        gpadBtn.setOnKeyUpListener(key -> { if (mInputEnabled) mOnKeyUpListener.onKeyUp(key); });
+    }
+
+    /**
+     * Accende o spegne l'invio dei tasti al gioco, lasciandoli visibili.
+     * Usato mentre la schermata delle impostazioni e' aperta.
+     */
+    public void setInputEnabled(boolean enabled)
+    {
+        mInputEnabled = enabled;
+    }
+
+    /**
+     * Cambia SOLO l'opacita', subito, senza ricostruire i controlli.
+     *
+     * Serve per l'anteprima mentre si trascina il cursore. Si puo' chiamare
+     * quante volte si vuole perche' ViewUtils.changeOpacity imposta un valore
+     * assoluto.
+     *
+     * ATTENZIONE: con la DIMENSIONE non si puo' fare lo stesso.
+     * ViewUtils.resize e' CUMULATIVA (moltiplica i parametri di layout attuali),
+     * quindi chiamarla due volte all'80% da' il 64%. Per la dimensione serve
+     * ricostruire i controlli da zero, cioe' detach + attachTo.
+     */
+    public void applyOpacity(int opacity)
+    {
+        if (mGamepadLayout == null || mInvisible)
+            return;
+        ViewUtils.changeOpacity(mGamepadLayout, opacity);
     }
 
     /**

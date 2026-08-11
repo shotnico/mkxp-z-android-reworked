@@ -75,33 +75,49 @@
     <!-- ============== D-Pad ============== -->
     <com.hatkid.mkxpz.gamepad.GamepadDPad
         android:id="@+id/dpad"
-        android:layout_width="@dimen/_118sdp"
-        android:layout_height="@dimen/_118sdp"
+        android:layout_width="@dimen/_104sdp"
+        android:layout_height="@dimen/_104sdp"
         android:layout_alignParentStart="true"
         android:layout_above="@+id/buttons_system_row"
-        android:layout_marginStart="@dimen/_10sdp"
-        android:layout_marginBottom="@dimen/_16sdp"
+        android:layout_marginStart="@dimen/_12sdp"
+        android:layout_marginBottom="@dimen/_18sdp"
         android:clickable="false"
         android:focusable="false"
         app:bgDrawable="@drawable/gamepad_dpad_back"
         app:fgDrawable="@drawable/gamepad_dpad_front"
     />
 
-    <!-- ============== Rombo: OGG / CORSA / A / B ============== -->
+    <!-- ============== Rombo: OGG / CORSA / A / B ==============
+
+         PERCHE' QUESTE MISURE.
+         Prima il rombo aveva alignParentEnd E toEndOf="@id/dpad" insieme, con
+         larghezza fissa: due vincoli di posizione inconciliabili. RelativeLayout
+         non puo' soddisfarli entrambi, ne fa vincere uno, e su uno schermo dove
+         D-pad + rombo non ci stanno affiancati il tasto CORSA (quello a sinistra
+         del rombo) finiva quasi sopra al D-pad.
+
+         Le misure sono in "sdp", che scalano con la diagonale dello schermo:
+         su un telefono grande 138sdp valgono molto piu' di 138dp, ed e' per
+         questo che il conto tornava sulla carta e non sul telefono.
+
+         Ora c'e' UN SOLO vincolo orizzontale, toEndOf con un margine iniziale:
+         la posizione e' il bordo destro del D-pad piu' 30sdp. E' deterministica
+         e non si puo' sovrapporre per costruzione. Le misure sono ridotte per
+         lasciare spazio davvero.
+    -->
     <RelativeLayout
         android:id="@+id/buttons_action_layout"
-        android:layout_width="@dimen/_138sdp"
-        android:layout_height="@dimen/_138sdp"
-        android:layout_alignParentEnd="true"
+        android:layout_width="@dimen/_116sdp"
+        android:layout_height="@dimen/_116sdp"
         android:layout_above="@+id/buttons_system_row"
         android:layout_toEndOf="@+id/dpad"
-        android:layout_marginEnd="@dimen/_6sdp"
-        android:layout_marginBottom="@dimen/_8sdp"
+        android:layout_marginStart="@dimen/_30sdp"
+        android:layout_marginBottom="@dimen/_12sdp"
     >
         <com.hatkid.mkxpz.gamepad.GamepadButton
             android:id="@+id/button_Z"
-            android:layout_width="@dimen/_44sdp"
-            android:layout_height="@dimen/_44sdp"
+            android:layout_width="@dimen/_38sdp"
+            android:layout_height="@dimen/_38sdp"
             android:layout_alignParentTop="true"
             android:layout_centerHorizontal="true"
             app:bgDrawable="@drawable/gamepad_button_circle"
@@ -109,8 +125,8 @@
         />
         <com.hatkid.mkxpz.gamepad.GamepadButton
             android:id="@+id/button_A"
-            android:layout_width="@dimen/_46sdp"
-            android:layout_height="@dimen/_46sdp"
+            android:layout_width="@dimen/_40sdp"
+            android:layout_height="@dimen/_40sdp"
             android:layout_alignParentStart="true"
             android:layout_centerVertical="true"
             app:bgDrawable="@drawable/gamepad_button_circle"
@@ -118,8 +134,8 @@
         />
         <com.hatkid.mkxpz.gamepad.GamepadButton
             android:id="@+id/button_C"
-            android:layout_width="@dimen/_50sdp"
-            android:layout_height="@dimen/_50sdp"
+            android:layout_width="@dimen/_44sdp"
+            android:layout_height="@dimen/_44sdp"
             android:layout_alignParentEnd="true"
             android:layout_centerVertical="true"
             app:bgDrawable="@drawable/gamepad_button_circle"
@@ -127,8 +143,8 @@
         />
         <com.hatkid.mkxpz.gamepad.GamepadButton
             android:id="@+id/button_B"
-            android:layout_width="@dimen/_50sdp"
-            android:layout_height="@dimen/_50sdp"
+            android:layout_width="@dimen/_44sdp"
+            android:layout_height="@dimen/_44sdp"
             android:layout_alignParentBottom="true"
             android:layout_centerHorizontal="true"
             app:bgDrawable="@drawable/gamepad_button_circle"

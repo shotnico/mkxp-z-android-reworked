@@ -8,9 +8,12 @@
     <string name="loading_body">Caricamento in corso: circa un minuto e mezzo.\nIntanto puoi regolare i tasti qui sotto.</string>
     <string name="loading_ready">Caricamento probabilmente finito: tocca ENTRA NEL GIOCO.</string>
 
+    <string name="splash_hint">Caricamento in corso…</string>
+
     <string name="controls">Tasti a schermo</string>
+    <string name="controls_preview">I tasti veri sono visibili qui fuori: cambiano mentre regoli. Puoi premerli per provarli, non vanno al gioco.</string>
     <string name="opacity_value">Opacità: %1$d%%</string>
-    <string name="scale_value">Dimensione: %1$d%%</string>
+    <string name="scale_value">Dimensione: %1$d%% (si applica quando lasci il cursore)</string>
 
     <string name="orientation">Orientamento</string>
     <string name="orient_auto_short">Automatico</string>

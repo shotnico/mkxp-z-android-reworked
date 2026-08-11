@@ -11,6 +11,12 @@
     mkxp-z non presenta nulla, e in quella fase non compare niente di disegnato dal
     gioco (verificato: nemmeno un rettangolo a z=999999). Le View Android invece si
     vedono, perche' non passano da quella presentazione.
+
+    NON occupa tutto lo schermo, di proposito: MainActivity.applyOverlayLayout() la
+    limita alla zona dove sta il gioco (in verticale la fascia alta), cosi' i tasti
+    restano SCOPERTI e si vedono cambiare mentre si regola l'opacita'. Sono
+    l'anteprima. Durante questa fase i tasti non inviano nulla al gioco
+    (Gamepad.setInputEnabled(false)), ma si illuminano quando li premi.
 -->
 <ScrollView
     xmlns:android="http://schemas.android.com/apk/res/android"
@@ -18,7 +24,7 @@
     android:id="@+id/loading_overlay"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0D0D14"
+    android:background="#F00D0D14"
     android:clickable="true"
     android:focusable="true"
     android:fillViewport="true"
@@ -82,6 +88,15 @@
             android:textSize="14sp"
             android:textStyle="bold"
             android:paddingTop="18dp"
+        />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/controls_preview"
+            android:textColor="#8CE0A8"
+            android:textSize="11sp"
+            android:paddingBottom="4dp"
         />
 
         <TextView

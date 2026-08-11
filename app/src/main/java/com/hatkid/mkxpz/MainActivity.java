@@ -75,6 +75,17 @@ public class MainActivity extends SDLActivity
     private static final long LOADING_OVERLAY_MS = 95000;   // ~85 s di avvio + margine
     private View mLoadingOverlay;
 
+    // Schermata iniziale (schermata_iniziale.png): quanto resta a schermo prima
+    // di lasciare il posto alle impostazioni. Non aggiunge attesa: il gioco sta
+    // caricando sotto per tutto questo tempo.
+    private static final long SPLASH_MS = 4500;
+    private static final long SPLASH_FADE_MS = 600;
+    private View mSplash;
+
+    // Frazione della larghezza occupata dal pannello impostazioni in orizzontale.
+    // Meno di 1 perche' i tasti ai lati devono restare visibili: sono l'anteprima.
+    private static final float OVERLAY_WIDTH_LAND = 0.60f;
+
     private void runSDLThread()
     {
         if (!mStarted) {
@@ -189,7 +200,54 @@ public class MainActivity extends SDLActivity
             applySurfaceLayout();          // in verticale mette il gioco in alto
             mGamepad.attachTo(this, mLayout);
             showLoadingOverlay();
+            // La schermata iniziale va aggiunta DOPO l'overlay, cosi' resta lei
+            // davanti per i primi secondi. L'ordine dei figli e' l'ordine di
+            // disegno: l'ultimo aggiunto sta sopra.
+            showSplash();
         }
+    }
+
+    /**
+     * Mostra schermata_iniziale.png per qualche secondo, poi la sfuma via
+     * lasciando le impostazioni.
+     *
+     * Non allunga l'avvio di un secondo: il thread SDL sta gia' caricando il gioco
+     * mentre l'immagine e' a schermo. Copre la parte di attesa in cui prima si
+     * vedeva solo nero.
+     */
+    private void showSplash()
+    {
+        try {
+            mSplash = getLayoutInflater().inflate(R.layout.splash_screen, mLayout, false);
+            mLayout.addView(mSplash);
+
+            // Un tocco la salta: se uno ha gia' visto l'immagine non deve subirla.
+            mSplash.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) { hideSplash(); }
+            });
+
+            new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                @Override public void run() { hideSplash(); }
+            }, SPLASH_MS);
+        } catch (Exception e) {
+            Log.w(TAG, "Schermata iniziale non mostrata: " + e);
+        }
+    }
+
+    private void hideSplash()
+    {
+        final View s = mSplash;
+        if (s == null)
+            return;
+        mSplash = null;                      // niente doppie chiamate da tocco + timer
+
+        s.animate().alpha(0f).setDuration(SPLASH_FADE_MS)
+         .withEndAction(new Runnable() {
+             @Override public void run() {
+                 if (s.getParent() instanceof ViewGroup)
+                     ((ViewGroup) s.getParent()).removeView(s);
+             }
+         }).start();
     }
 
     private void applyOrientationPreference()
@@ -287,6 +345,45 @@ public class MainActivity extends SDLActivity
     }
 
     /**
+     * Limita il pannello delle impostazioni, cosi' i tasti restano visibili.
+     *
+     * Il pannello copriva tutto lo schermo, quindi regolare l'opacita' era un
+     * atto di fede: il valore cambiava davvero, ma nascosto sotto il pannello.
+     * Ora il pannello occupa solo la zona del gioco e i tasti restano fuori:
+     *
+     *   verticale   -> la fascia ALTA, esattamente quanto la superficie di gioco
+     *                  (larghezza x 3/4). I tasti sono nella fascia bassa, liberi.
+     *   orizzontale -> una colonna centrale al 60% della larghezza. I tasti stanno
+     *                  ai due lati, quindi restano scoperti.
+     */
+    private void applyOverlayLayout()
+    {
+        if (mLayout == null || mLoadingOverlay == null)
+            return;
+
+        try {
+            boolean verticale = getResources().getConfiguration().orientation
+                                == Configuration.ORIENTATION_PORTRAIT;
+            int w = getResources().getDisplayMetrics().widthPixels;
+
+            RelativeLayout.LayoutParams p;
+            if (verticale) {
+                p = new RelativeLayout.LayoutParams(
+                        RelativeLayout.LayoutParams.MATCH_PARENT, w * 3 / 4);
+                p.addRule(RelativeLayout.ALIGN_PARENT_TOP);
+            } else {
+                p = new RelativeLayout.LayoutParams(
+                        Math.round(w * OVERLAY_WIDTH_LAND),
+                        RelativeLayout.LayoutParams.MATCH_PARENT);
+                p.addRule(RelativeLayout.CENTER_HORIZONTAL);
+            }
+            mLoadingOverlay.setLayoutParams(p);
+        } catch (Exception e) {
+            Log.w(TAG, "Layout del pannello impostazioni non applicato: " + e);
+        }
+    }
+
+    /**
      * Schermata di caricamento sopra la superficie di gioco.
      *
      * Serve perche' l'avvio richiede ~85 s, di cui ~80 in cui mkxp-z non presenta
@@ -303,6 +400,12 @@ public class MainActivity extends SDLActivity
         try {
             mLoadingOverlay = getLayoutInflater().inflate(R.layout.loading_overlay, mLayout, false);
             mLayout.addView(mLoadingOverlay);   // aggiunta per ultima = sopra a tutto
+            applyOverlayLayout();               // non copre i tasti: sono l'anteprima
+
+            // I tasti si vedono e reagiscono al tocco, ma non arrivano al gioco:
+            // il gioco sta caricando e un tocco a caso sulla schermata del titolo
+            // potrebbe far partire una partita.
+            mGamepad.setInputEnabled(false);
 
             final SharedPreferences prefs = getSharedPreferences(GamepadConfig.PREFS, MODE_PRIVATE);
 
@@ -324,15 +427,27 @@ public class MainActivity extends SDLActivity
             SeekBar.OnSeekBarChangeListener l = new SeekBar.OnSeekBarChangeListener() {
                 @Override public void onProgressChanged(SeekBar s, int v, boolean fromUser) {
                     updateOverlayLabels(op.getProgress(), sc.getProgress());
+                    // ANTEPRIMA IN DIRETTA dell'opacita': si vede sui tasti veri,
+                    // che il pannello lascia scoperti, mentre si trascina.
+                    //
+                    // Solo l'opacita', non la dimensione: ViewUtils.changeOpacity
+                    // imposta un valore assoluto ed e' quindi ripetibile, mentre
+                    // ViewUtils.resize MOLTIPLICA i parametri di layout attuali e
+                    // chiamata a ogni pixel di trascinamento rimpicciolirebbe i
+                    // tasti fino a farli sparire. La dimensione si applica al
+                    // rilascio, ricostruendo i controlli.
+                    if (s == op)
+                        mGamepad.applyOpacity(op.getProgress());
                 }
                 @Override public void onStartTrackingTouch(SeekBar s) { }
                 @Override public void onStopTrackingTouch(SeekBar s) {
-                    // salva e riapplica subito: il gamepad viene ricostruito, cosi'
-                    // il risultato si vede senza riavviare
                     prefs.edit().putInt(GamepadConfig.KEY_OPACITY, op.getProgress())
                                 .putInt(GamepadConfig.KEY_SCALE, sc.getProgress())
                                 .apply();
-                    reloadGamepad();
+                    if (s == sc)
+                        reloadGamepad();     // la dimensione richiede la ricostruzione
+                    else
+                        mGamepad.applyOpacity(op.getProgress());
                 }
             };
             op.setOnSeekBarChangeListener(l);
@@ -422,9 +537,15 @@ public class MainActivity extends SDLActivity
             mGamepad.init(mGamepadConfig, mGamepadInvisible);
             mGamepad.detach();
             mGamepad.attachTo(this, mLayout);
+            // attachTo ricostruisce i tasti da zero, quindi il blocco dell'input
+            // va rimesso: senza questo, muovere il cursore della dimensione
+            // riabilitava i tasti mentre le impostazioni erano ancora aperte.
+            mGamepad.setInputEnabled(mLoadingOverlay == null);
             // l'overlay deve restare sopra i controlli appena riattaccati
             if (mLoadingOverlay != null)
                 mLoadingOverlay.bringToFront();
+            if (mSplash != null)
+                mSplash.bringToFront();
         } catch (Exception e) {
             Log.w(TAG, "Gamepad non ricostruito: " + e);
         }
@@ -445,6 +566,9 @@ public class MainActivity extends SDLActivity
             ((ViewGroup) mLoadingOverlay.getParent()).removeView(mLoadingOverlay);
 
         mLoadingOverlay = null;
+
+        // da qui i tasti comandano il gioco
+        mGamepad.setInputEnabled(true);
     }
 
     /**
@@ -463,8 +587,10 @@ public class MainActivity extends SDLActivity
 
         try {
             applySurfaceLayout();          // la superficie va rimessa a posto per il nuovo orientamento
+            applyOverlayLayout();          // e anche il pannello: cambia zona e misura
             mGamepad.detach();
             mGamepad.attachTo(this, mLayout);
+            mGamepad.setInputEnabled(mLoadingOverlay == null);
             if (mGamepadInvisible)
                 mGamepad.hideView();
             // Riattaccare il gamepad lo rimette come ultimo figlio, quindi sopra
@@ -472,6 +598,8 @@ public class MainActivity extends SDLActivity
             // impostazioni. L'overlay va riportato davanti.
             if (mLoadingOverlay != null)
                 mLoadingOverlay.bringToFront();
+            if (mSplash != null)
+                mSplash.bringToFront();
         } catch (Exception e) {
             Log.w(TAG, "Rotazione: gamepad non riattaccato: " + e);
         }
