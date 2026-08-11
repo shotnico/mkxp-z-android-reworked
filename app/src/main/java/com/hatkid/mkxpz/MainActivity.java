@@ -19,6 +19,7 @@ import android.view.MotionEvent;
 import android.view.InputDevice;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
@@ -207,6 +208,7 @@ public class MainActivity extends SDLActivity
         // L'app segue SEMPRE il telefono: girarlo passa in verticale, rimetterlo
         // di lato torna orizzontale. Vedi applyOrientationPreference per il
         // motivo per cui la scelta manuale e' stata rimossa.
+        disegnaSottoIlForo();
         applyOrientationPreference();
 
         // Setup in-screen gamepad
@@ -252,6 +254,60 @@ public class MainActivity extends SDLActivity
      * margini di sistema, che si leggono a runtime con getLocationOnScreen. La
      * parte che finisce sotto la barra di stato viene tagliata dal layout.
      */
+    /**
+     * Disegna anche nella striscia riservata al foro della fotocamera.
+     *
+     * Misurato su questo telefono: il sistema tiene fuori dalla finestra 98 px in
+     * alto in verticale e 96 px a sinistra in orizzontale. E' la stessa riserva,
+     * ruotata. Quelle strisce restavano nere e nessun disegno poteva coprirle,
+     * perche' stavano FUORI dal layout: lo sfondo viene ritagliato dal layout, e
+     * il layout non ci arrivava. Con SHORT_EDGES la finestra le include e lo
+     * sfondo arriva ai bordi.
+     *
+     * E' la causa unica delle due bande nere che si vedevano: quella in cima in
+     * verticale e quella a sinistra in orizzontale. Se il sistema ignorasse la
+     * richiesta, si torna al comportamento di prima senza rompere niente.
+     */
+    private void disegnaSottoIlForo()
+    {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P)
+            return;
+        try {
+            WindowManager.LayoutParams a = getWindow().getAttributes();
+            a.layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+            getWindow().setAttributes(a);
+        } catch (Exception e) {
+            Log.w(TAG, "Area del foro non abilitata: " + e);
+        }
+    }
+
+    /**
+     * Di quanto scende la scena dal bordo alto dello schermo, in verticale.
+     *
+     * Serve a fare spazio alla cornice superiore disegnata nello sfondo. Il valore
+     * e' una FRAZIONE dell'altezza dello schermo e non un numero fisso di pixel,
+     * perche' lo sfondo viene stirato sull'altezza reale (FIT_XY): il bordo alto
+     * della scena e il bordo basso della cornice disegnata devono cadere sulla
+     * stessa frazione, altrimenti ricompare una striscia nera.
+     *
+     * Il numero NON viene dal prompt ma dall'immagine vera, misurata al pixel: il
+     * rettangolo nero di bg_console.png (852x1846) comincia alla riga 153 e finisce
+     * alla 772. Il generatore non rispetta le quote al decimale -- il prompt
+     * chiedeva 10,3% e ha prodotto 8,3% -- e sono i 2 punti di differenza che
+     * farebbero ricomparire una striscia nera fra cornice e scena. Adattare il
+     * codice all'immagine e' l'unico verso che funziona: l'immagine e' fissa.
+     *
+     * 153/1846 = 8,288% -> su 2340 px la scena parte a 194 e finisce a 1004, cioe'
+     * 25 px oltre il punto in cui il disegno smette di essere nero (979). Quei
+     * 25 px di scocca finiscono DIETRO la scena e non si vedono: e' il verso
+     * innocuo dell'errore. Al contrario si vedrebbe del nero.
+     */
+    private int cornicePx()
+    {
+        return Math.round(getResources().getDisplayMetrics().heightPixels * 153f / 1846f);
+    }
+
     private void addSfondo()
     {
         try {
@@ -353,8 +409,9 @@ public class MainActivity extends SDLActivity
             p.addRule(RelativeLayout.ALIGN_PARENT_TOP);
             p.addRule(RelativeLayout.ALIGN_PARENT_START);
             if (verticale) {
+                // Sotto la scena, che ora parte da cornicePx() e non dal bordo.
                 int altezzaGioco = getResources().getDisplayMetrics().widthPixels * 3 / 4;
-                p.setMargins(bordo, altezzaGioco + bordo, 0, 0);
+                p.setMargins(bordo, cornicePx() + altezzaGioco + bordo, 0, 0);
             } else {
                 p.setMargins(bordo, bordo, 0, 0);
             }
@@ -506,7 +563,7 @@ public class MainActivity extends SDLActivity
             boolean verticale = getResources().getConfiguration().orientation
                                 == Configuration.ORIENTATION_PORTRAIT;
 
-            int larghezza, altezza, regola;
+            int larghezza, altezza, regola, margineAlto = 0;
             if (verticale) {
                 int w = (mLayout.getWidth() > 0)
                         ? mLayout.getWidth()
@@ -514,6 +571,11 @@ public class MainActivity extends SDLActivity
                 larghezza = RelativeLayout.LayoutParams.MATCH_PARENT;
                 altezza = w * 3 / 4;
                 regola = RelativeLayout.ALIGN_PARENT_TOP;
+                // La scena non parte piu' dal bordo: sopra ci va la cornice dello
+                // sfondo. Sotto, il nero che restava fra scena e disegno sparisce
+                // perche' il bordo basso della scena scende alla stessa quota a cui
+                // il disegno smette di essere nero.
+                margineAlto = cornicePx();
             } else {
                 int h = (mLayout.getHeight() > 0)
                         ? mLayout.getHeight()
@@ -524,13 +586,15 @@ public class MainActivity extends SDLActivity
             }
 
             ViewGroup.LayoutParams attuali = mSurface.getLayoutParams();
-            if (attuali != null && attuali.width == larghezza
-                    && attuali.height == altezza)
+            if (attuali instanceof RelativeLayout.LayoutParams
+                    && attuali.width == larghezza && attuali.height == altezza
+                    && ((RelativeLayout.LayoutParams) attuali).topMargin == margineAlto)
                 return;                     // gia' a posto: non ritoccare
 
             RelativeLayout.LayoutParams p =
                     new RelativeLayout.LayoutParams(larghezza, altezza);
             p.addRule(regola);
+            p.topMargin = margineAlto;
             mSurface.setLayoutParams(p);
         } catch (Exception e) {
             Log.w(TAG, "Layout della superficie non applicato: " + e);

@@ -50,14 +50,19 @@
         app:fgDrawable="@drawable/gamepad_dpad_front"
     />
 
-    <!-- ============== Rombo: OGG / CORSA / A / B ============== -->
+    <!-- ============== Rombo: OGG / CORSA / A / B ==============
+         marginEnd portato da 10sdp a zero, cioe' tutto a destra. Non e' solo
+         estetica: il rombo e' largo 160sdp = 450 px, esattamente la banda libera
+         a destra del gioco ((2340 - 1440) / 2). Con un margine sbordava dentro la
+         scena di 28 px; a zero riempie la banda esatta e i tasti restano tutti
+         sulla cornice. -->
     <RelativeLayout
         android:id="@+id/buttons_action_layout"
         android:layout_width="@dimen/_160sdp"
         android:layout_height="@dimen/_160sdp"
         android:layout_alignParentEnd="true"
         android:layout_alignParentBottom="true"
-        android:layout_marginEnd="@dimen/_10sdp"
+        android:layout_marginEnd="0dp"
         android:layout_marginBottom="@dimen/_8sdp"
     >
         <!-- vertice ALTO: OGG = oggetto registrato -->
@@ -137,7 +142,7 @@
         android:layout_height="@dimen/_34sdp"
         android:layout_alignParentEnd="true"
         android:layout_alignParentTop="true"
-        android:layout_marginEnd="@dimen/_14sdp"
+        android:layout_marginEnd="@dimen/_4sdp"
         android:layout_marginTop="@dimen/_14sdp"
         app:bgDrawable="@drawable/gamepad_button_circle"
         tools:ignore="ImageContrastCheck"
@@ -149,7 +154,7 @@
         android:layout_height="@dimen/_34sdp"
         android:layout_alignParentEnd="true"
         android:layout_below="@+id/button_X"
-        android:layout_marginEnd="@dimen/_14sdp"
+        android:layout_marginEnd="@dimen/_4sdp"
         android:layout_marginTop="@dimen/_8sdp"
         app:bgDrawable="@drawable/gamepad_button_circle"
         tools:ignore="ImageContrastCheck"
