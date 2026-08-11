@@ -245,22 +245,54 @@ public class MainActivity extends SDLActivity
             mBottoneImpostazioni.setContentDescription(getString(R.string.settings_open));
             mBottoneImpostazioni.setAlpha(0.55f);
 
-            int lato = Math.round(getResources().getDisplayMetrics().density * 34);
-            int bordo = Math.round(getResources().getDisplayMetrics().density * 6);
-            RelativeLayout.LayoutParams p =
-                    new RelativeLayout.LayoutParams(lato, lato);
-            p.addRule(RelativeLayout.ALIGN_PARENT_TOP);
-            p.addRule(RelativeLayout.ALIGN_PARENT_START);
-            p.setMargins(bordo, bordo, 0, 0);
-            mBottoneImpostazioni.setLayoutParams(p);
-
             mBottoneImpostazioni.setOnClickListener(new View.OnClickListener() {
                 @Override public void onClick(View v) { showSettingsPanel(); }
             });
 
             mLayout.addView(mBottoneImpostazioni);
+            posizionaIngranaggio();
         } catch (Exception e) {
             Log.w(TAG, "Tasto impostazioni non aggiunto: " + e);
+        }
+    }
+
+    /**
+     * Dove sta l'ingranaggio, secondo l'orientamento.
+     *
+     *   verticale   -> SOTTO la scena del gioco, a sinistra. In verticale il
+     *                  gioco occupa la fascia alta e in cima non c'e' spazio
+     *                  libero: l'ingranaggio starebbe sopra l'immagine. Sotto
+     *                  invece c'e' la fascia vuota fra gioco e tasti.
+     *   orizzontale -> in alto a sinistra, sopra la scena: li' non c'e' altro
+     *                  spazio disponibile, il gioco riempie tutta l'altezza.
+     *
+     * La quota "sotto il gioco" e' la stessa altezza usata da applySurfaceLayout:
+     * larghezza x 3/4, perche' la scena e' 4:3.
+     */
+    private void posizionaIngranaggio()
+    {
+        if (mBottoneImpostazioni == null)
+            return;
+        try {
+            float d = getResources().getDisplayMetrics().density;
+            int lato = Math.round(d * 34);
+            int bordo = Math.round(d * 6);
+            boolean verticale = getResources().getConfiguration().orientation
+                                == Configuration.ORIENTATION_PORTRAIT;
+
+            RelativeLayout.LayoutParams p =
+                    new RelativeLayout.LayoutParams(lato, lato);
+            p.addRule(RelativeLayout.ALIGN_PARENT_TOP);
+            p.addRule(RelativeLayout.ALIGN_PARENT_START);
+            if (verticale) {
+                int altezzaGioco = getResources().getDisplayMetrics().widthPixels * 3 / 4;
+                p.setMargins(bordo, altezzaGioco + bordo, 0, 0);
+            } else {
+                p.setMargins(bordo, bordo, 0, 0);
+            }
+            mBottoneImpostazioni.setLayoutParams(p);
+        } catch (Exception e) {
+            Log.w(TAG, "Ingranaggio non riposizionato: " + e);
         }
     }
 
@@ -622,6 +654,7 @@ public class MainActivity extends SDLActivity
         try {
             applySurfaceLayout();          // la superficie va rimessa a posto per il nuovo orientamento
             applyPanelLayout();            // e anche il pannello: cambia zona e misura
+            posizionaIngranaggio();        // in verticale va sotto il gioco, in orizzontale in alto
             mGamepad.detach();
             mGamepad.attachTo(this, mLayout);
             mGamepad.setInputEnabled(mPannello == null);
