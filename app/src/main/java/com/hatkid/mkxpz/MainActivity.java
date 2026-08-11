@@ -72,7 +72,11 @@ public class MainActivity extends SDLActivity
     private boolean mGamepadInvisible = false;
 
     // Schermata di caricamento sopra la superficie di gioco
-    private static final long LOADING_OVERLAY_MS = 95000;   // ~85 s di avvio + margine
+    // Quando cambiare il messaggio in "il gioco e' pronto". Era 95 s, tarato su
+    // un avvio che ne richiedeva ~85: adesso il titolo compare in circa 3,5 s
+    // (pathCache spento), quindi il vecchio valore avrebbe lasciato a schermo un
+    // messaggio falso per un minuto e mezzo.
+    private static final long LOADING_OVERLAY_MS = 6000;
     private View mLoadingOverlay;
 
     // Schermata iniziale (schermata_iniziale.png): quanto resta a schermo prima
@@ -87,6 +91,16 @@ public class MainActivity extends SDLActivity
     // 0,50 e non 0,60: a 0,60 il pannello arrivava sopra al tasto CORSA e sopra
     // SALVA/SPEED, che risultavano tagliati (verificato a schermo).
     private static final float OVERLAY_WIDTH_LAND = 0.50f;
+
+    // In verticale il pannello lascia libera la fascia BASSA, quella dei tasti.
+    // Misurato sul telefono (1080x2340): i tasti stanno da y=1697 a y=2178, cioe'
+    // l'ultimo 27% dell'altezza. Il pannello prende il resto.
+    //
+    // Prima il pannello era alto quanto la sola zona del gioco (larghezza x 3/4 =
+    // 810 px su 2340): i tasti si vedevano, ma nel pannello restavano fuori
+    // Orientamento e Lingua, raggiungibili solo scorrendo. Le voci non erano
+    // nemmeno visibili nella gerarchia delle view, che e' come me ne sono accorto.
+    private static final float OVERLAY_HEIGHT_PORT = 0.72f;
 
     private void runSDLThread()
     {
@@ -252,17 +266,51 @@ public class MainActivity extends SDLActivity
          }).start();
     }
 
-    private void applyOrientationPreference()
+    /**
+     * L'orientamento richiesto, secondo la preferenza salvata.
+     *
+     * Si usano le costanti FISSE (PORTRAIT / LANDSCAPE) e non quelle SENSOR_*:
+     * le varianti col sensore ammettono entrambi i versi e ogni capovolgimento
+     * produce un cambio di configurazione in piu', cioe' un'altra distruzione e
+     * ricreazione della superficie di disegno. Meno cambi, meno occasioni di
+     * perdere la superficie mentre SDL la sta creando.
+     */
+    private int orientamentoRichiesto()
     {
         int orient = getSharedPreferences(GamepadConfig.PREFS, MODE_PRIVATE)
                         .getInt(GamepadConfig.KEY_ORIENTATION, GamepadConfig.ORIENT_AUTO);
 
         if (orient == GamepadConfig.ORIENT_LANDSCAPE)
-            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
-        else if (orient == GamepadConfig.ORIENT_PORTRAIT)
-            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT);
-        else
-            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);
+            return ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE;
+        if (orient == GamepadConfig.ORIENT_PORTRAIT)
+            return ActivityInfo.SCREEN_ORIENTATION_PORTRAIT;
+        return ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR;
+    }
+
+    /**
+     * Imposta l'orientamento SOLO se e' diverso da quello gia' richiesto.
+     *
+     * QUESTO E' IL PUNTO DELICATO. Con la preferenza su "Verticale" il gioco non
+     * partiva affatto: nel log comparivano "surface is not valid" e "skip
+     * updating surface", e il thread nativo non veniva mai avviato perche' la
+     * superficie non diventava valida. Il layer della finestra risultava ancora
+     * 2340x1080, cioe' orizzontale, nonostante la richiesta di verticale.
+     *
+     * La causa e' la ripetizione: setRequestedOrientation veniva chiamato a ogni
+     * richiesta di SDL, anche quando il valore era gia' quello giusto. Ogni
+     * chiamata puo' innescare un cambio di configurazione, che distrugge e
+     * ricrea la superficie; se accade mentre SDL la sta creando, SDL resta in
+     * attesa di una superficie che viene continuamente rifatta.
+     *
+     * Con orientamento "Automatico" il problema non si vedeva perche' la
+     * richiesta coincide con lo stato del sistema e non cambia nulla: misurato,
+     * Ruby partiva in 1,1 s in automatico e non partiva mai in verticale.
+     */
+    private void applyOrientationPreference()
+    {
+        int voluto = orientamentoRichiesto();
+        if (getRequestedOrientation() != voluto)
+            setRequestedOrientation(voluto);
     }
 
     /**
@@ -286,21 +334,10 @@ public class MainActivity extends SDLActivity
     @Override
     public void setOrientationBis(int w, int h, boolean resizable, String hint)
     {
-        int orient = getSharedPreferences(GamepadConfig.PREFS, MODE_PRIVATE)
-                        .getInt(GamepadConfig.KEY_ORIENTATION, GamepadConfig.ORIENT_AUTO);
-
-        if (orient == GamepadConfig.ORIENT_PORTRAIT) {
-            Log.i(TAG, "setOrientationBis: forzo il verticale su richiesta dell'utente");
-            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT);
-            return;
-        }
-        if (orient == GamepadConfig.ORIENT_LANDSCAPE) {
-            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
-            return;
-        }
-        // Automatico: SDL qui imporrebbe comunque il solo orizzontale, per via
-        // dell'hint. Lasciamo entrambi gli orientamenti, cosi' ruotare funziona.
-        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);
+        // Passa da applyOrientationPreference, che NON riscrive l'orientamento
+        // se e' gia' quello giusto: vedi il commento la', e' il motivo per cui
+        // il verticale non partiva.
+        applyOrientationPreference();
     }
 
     /**
@@ -367,11 +404,13 @@ public class MainActivity extends SDLActivity
             boolean verticale = getResources().getConfiguration().orientation
                                 == Configuration.ORIENTATION_PORTRAIT;
             int w = getResources().getDisplayMetrics().widthPixels;
+            int h = getResources().getDisplayMetrics().heightPixels;
 
             RelativeLayout.LayoutParams p;
             if (verticale) {
                 p = new RelativeLayout.LayoutParams(
-                        RelativeLayout.LayoutParams.MATCH_PARENT, w * 3 / 4);
+                        RelativeLayout.LayoutParams.MATCH_PARENT,
+                        Math.round(h * OVERLAY_HEIGHT_PORT));
                 p.addRule(RelativeLayout.ALIGN_PARENT_TOP);
             } else {
                 p = new RelativeLayout.LayoutParams(

@@ -5,8 +5,11 @@
 
     <!-- Schermata iniziale / caricamento -->
     <string name="enter_game">ENTRA NEL GIOCO</string>
-    <string name="loading_body">Caricamento in corso: circa un minuto e mezzo.\nIntanto puoi regolare i tasti qui sotto.</string>
-    <string name="loading_ready">Caricamento probabilmente finito: tocca ENTRA NEL GIOCO.</string>
+    <!-- Prima diceva "circa un minuto e mezzo": era vero finche' pathCache
+         scandiva 22.253 file a ogni avvio. Ora il gioco arriva alla schermata
+         del titolo in circa 3 secondi e mezzo, quindi il testo va detto giusto. -->
+    <string name="loading_body">Il gioco è pronto in pochi secondi.\nIntanto puoi regolare i tasti qui sotto.</string>
+    <string name="loading_ready">Il gioco è pronto: tocca ENTRA NEL GIOCO.</string>
 
     <string name="splash_hint">Caricamento in corso…</string>
 
