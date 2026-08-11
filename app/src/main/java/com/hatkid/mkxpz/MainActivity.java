@@ -302,10 +302,18 @@ public class MainActivity extends SDLActivity
      * 25 px oltre il punto in cui il disegno smette di essere nero (979). Quei
      * 25 px di scocca finiscono DIETRO la scena e non si vedono: e' il verso
      * innocuo dell'errore. Al contrario si vedrebbe del nero.
+     *
+     * ATTENZIONE alla fonte delle misure: va usata quella REALE dello schermo, la
+     * stessa con cui viene dimensionato lo sfondo. getResources() qui riporta
+     * 2111 e non 2340, e con quella la scena partiva da 175 invece che da 194:
+     * 19 px di nero fra cornice e gioco. Due misure diverse per la stessa cosa
+     * sono un errore anche quando entrambe "sembrano" l'altezza dello schermo.
      */
     private int cornicePx()
     {
-        return Math.round(getResources().getDisplayMetrics().heightPixels * 153f / 1846f);
+        android.util.DisplayMetrics dm = new android.util.DisplayMetrics();
+        getWindowManager().getDefaultDisplay().getRealMetrics(dm);
+        return Math.round(dm.heightPixels * 153f / 1846f);
     }
 
     private void addSfondo()
@@ -315,6 +323,22 @@ public class MainActivity extends SDLActivity
             mSfondo.setScaleType(ImageView.ScaleType.FIT_XY);
             mSfondo.setImageResource(R.drawable.bg_console);
             mLayout.addView(mSfondo, 0);   // primo figlio = dietro a tutto
+            // Ogni volta che il layout cambia posizione o misura, sfondo e scena si
+            // riallineano. Serve perche' la posizione del layout sullo schermo
+            // cambia DOPO onCreate: la richiesta di disegnare sotto il foro della
+            // fotocamera viene applicata dal sistema in un secondo giro di layout.
+            // Leggendola una volta sola si prendeva il valore vecchio (97 px) e lo
+            // sfondo restava spostato in alto di 97 px: da cui la striscia nera fra
+            // cornice e gioco. Le guardie di idempotenza dentro allineaSfondo e
+            // applicaMisureSuperficie evitano che il nuovo setLayoutParams inneschi
+            // un ciclo di layout senza fine.
+            mLayout.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
+                @Override public void onLayoutChange(View v, int l, int t, int r, int b,
+                                                    int vl, int vt, int vr, int vb) {
+                    allineaSfondo();
+                    applicaMisureSuperficie();
+                }
+            });
             posizionaSfondo();
         } catch (Exception e) {
             Log.w(TAG, "Sfondo non aggiunto: " + e);
@@ -328,24 +352,50 @@ public class MainActivity extends SDLActivity
         // dopo il layout: prima di allora getLocationOnScreen non sa ancora dove
         // si trova il layout e i margini di sistema risulterebbero zero
         mLayout.post(new Runnable() {
-            @Override public void run() {
-                try {
-                    android.util.DisplayMetrics dm = new android.util.DisplayMetrics();
-                    getWindowManager().getDefaultDisplay().getRealMetrics(dm);
-                    int[] pos = new int[2];
-                    mLayout.getLocationOnScreen(pos);
-
-                    RelativeLayout.LayoutParams p =
-                            new RelativeLayout.LayoutParams(dm.widthPixels, dm.heightPixels);
-                    p.leftMargin = -pos[0];
-                    p.topMargin = -pos[1];
-                    mSfondo.setLayoutParams(p);
-                    mSfondo.setImageResource(R.drawable.bg_console);  // versione dell'orientamento attuale
-                } catch (Exception e) {
-                    Log.w(TAG, "Sfondo non posizionato: " + e);
-                }
-            }
+            @Override public void run() { allineaSfondo(); }
         });
+    }
+
+    /**
+     * Mappa lo sfondo sullo SCHERMO, non sul layout.
+     *
+     * Il layout puo' cominciare piu' in basso o piu' a destra dello schermo, e di
+     * quanto lo si sa solo a runtime: si legge con getLocationOnScreen e si
+     * compensa con margini negativi. Va rifatto ad ogni cambio di layout, perche'
+     * quel numero cambia quando il sistema applica la richiesta sul foro della
+     * fotocamera o quando il telefono ruota.
+     *
+     * La guardia in mezzo non e' un'ottimizzazione: senza di essa ogni chiamata
+     * cambierebbe i parametri, il cambio innescherebbe un nuovo layout e il layout
+     * richiamerebbe questo metodo, per sempre.
+     */
+    private void allineaSfondo()
+    {
+        if (mSfondo == null || mLayout == null)
+            return;
+        try {
+            android.util.DisplayMetrics dm = new android.util.DisplayMetrics();
+            getWindowManager().getDefaultDisplay().getRealMetrics(dm);
+            int[] pos = new int[2];
+            mLayout.getLocationOnScreen(pos);
+
+            ViewGroup.LayoutParams att = mSfondo.getLayoutParams();
+            if (att instanceof RelativeLayout.LayoutParams) {
+                RelativeLayout.LayoutParams a = (RelativeLayout.LayoutParams) att;
+                if (a.width == dm.widthPixels && a.height == dm.heightPixels
+                        && a.leftMargin == -pos[0] && a.topMargin == -pos[1])
+                    return;                 // gia' allineato: non ritoccare
+            }
+
+            RelativeLayout.LayoutParams p =
+                    new RelativeLayout.LayoutParams(dm.widthPixels, dm.heightPixels);
+            p.leftMargin = -pos[0];
+            p.topMargin = -pos[1];
+            mSfondo.setLayoutParams(p);
+            mSfondo.setImageResource(R.drawable.bg_console);  // versione dell'orientamento attuale
+        } catch (Exception e) {
+            Log.w(TAG, "Sfondo non allineato: " + e);
+        }
     }
 
     /**
