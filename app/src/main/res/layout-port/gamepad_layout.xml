@@ -100,18 +100,24 @@
          su un telefono grande 138sdp valgono molto piu' di 138dp, ed e' per
          questo che il conto tornava sulla carta e non sul telefono.
 
-         Ora c'e' UN SOLO vincolo orizzontale, toEndOf con un margine iniziale:
-         la posizione e' il bordo destro del D-pad piu' 30sdp. E' deterministica
-         e non si puo' sovrapporre per costruzione. Le misure sono ridotte per
-         lasciare spazio davvero.
+         Ora c'e' UN SOLO vincolo orizzontale: alignParentEnd con un margine.
+         Il rombo sta sul bordo destro, dove arriva il pollice, e non ci sono
+         vincoli in conflitto.
+
+         Che non si sovrappongano non e' una speranza, e' misurato sul telefono
+         (schermo 1080 px di larghezza, tools/misura_tasti.py):
+             D-pad  323 px      rombo  360 px      totale 683 px
+         restano 397 px, quindi lo stacco e' abbondante. Con il primo tentativo
+         (toEndOf + margine iniziale) lo stacco misurato era 101 px ma il rombo
+         finiva a 256 px dal bordo destro, cioe' troppo verso il centro.
     -->
     <RelativeLayout
         android:id="@+id/buttons_action_layout"
         android:layout_width="@dimen/_116sdp"
         android:layout_height="@dimen/_116sdp"
         android:layout_above="@+id/buttons_system_row"
-        android:layout_toEndOf="@+id/dpad"
-        android:layout_marginStart="@dimen/_30sdp"
+        android:layout_alignParentEnd="true"
+        android:layout_marginEnd="@dimen/_16sdp"
         android:layout_marginBottom="@dimen/_12sdp"
     >
         <com.hatkid.mkxpz.gamepad.GamepadButton

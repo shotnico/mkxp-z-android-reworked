@@ -84,7 +84,9 @@ public class MainActivity extends SDLActivity
 
     // Frazione della larghezza occupata dal pannello impostazioni in orizzontale.
     // Meno di 1 perche' i tasti ai lati devono restare visibili: sono l'anteprima.
-    private static final float OVERLAY_WIDTH_LAND = 0.60f;
+    // 0,50 e non 0,60: a 0,60 il pannello arrivava sopra al tasto CORSA e sopra
+    // SALVA/SPEED, che risultavano tagliati (verificato a schermo).
+    private static final float OVERLAY_WIDTH_LAND = 0.50f;
 
     private void runSDLThread()
     {
