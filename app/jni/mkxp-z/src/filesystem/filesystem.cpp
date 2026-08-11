@@ -36,6 +36,7 @@
 #include <algorithm>
 #include <stack>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <vector>
@@ -385,9 +386,39 @@ void FileSystem::removePath(const char *path, bool reload) {
     if (reload) reloadPathCache();
 }
 
+/* Persistent path cache.
+ *
+ * Building the cache calls PHYSFS_stat() on every file in the game
+ * directory. On Android that goes through FUSE, and with ~22000 files it
+ * takes over a minute on every single launch. The result depends only on
+ * which files exist, so it is written to disk once and reloaded afterwards.
+ *
+ * Validity is checked against the modification time of every directory that
+ * was walked: adding, removing or renaming a file changes the mtime of its
+ * parent directory. File *contents* may change freely, which is correct,
+ * since the cache only maps names. Files added directly in the game root are
+ * not detected; delete the cache file to force a rebuild. */
+#define PATH_CACHE_FILE ".mkxp_pathcache"
+#define PATH_CACHE_MAGIC "mkxp-z path cache 1"
+
+/* One directory as stored in the cache file: its mixed case path, its mtime,
+ * and its filenames in enumeration order. Both live maps are rebuilt from
+ * this, so the reloaded cache is identical to a freshly scanned one,
+ * including the order in which directory listings are returned. */
+struct DirCacheEntry {
+  std::string mixedPath;
+  PHYSFS_sint64 modtime;
+  std::vector<std::string> files;
+};
+
 struct CacheEnumData {
   FileSystemPrivate *p;
   std::stack<std::vector<std::string> *> fileLists;
+
+  /* collected while scanning, only to be written to the cache file.
+   * Indices, not pointers: the vector reallocates as it grows. */
+  std::vector<DirCacheEntry> dirs;
+  std::stack<size_t> dirStack;
 
 #ifdef __APPLE__
   iconv_t nfd2nfc;
@@ -451,9 +482,18 @@ static PHYSFS_EnumerateCallbackResult cacheEnumCB(void *d, const char *origdir,
     /* Create a new list for this directory */
     std::vector<std::string> &list = data.p->fileLists[lowerCase];
 
+    /* Record it for the cache file, with the mtime used to validate it */
+    DirCacheEntry entry;
+    entry.mixedPath = mixedCase;
+    entry.modtime = stat.modtime;
+    data.dirs.push_back(entry);
+    size_t index = data.dirs.size() - 1;
+
     /* Iterate over its contents */
     data.fileLists.push(&list);
+    data.dirStack.push(index);
     PHYSFS_enumerate(fullPath, cacheEnumCB, d);
+    data.dirStack.pop();
     data.fileLists.pop();
   } else {
     /* Get the file list for the directory we're currently
@@ -466,25 +506,201 @@ static PHYSFS_EnumerateCallbackResult cacheEnumCB(void *d, const char *origdir,
 
     /* Add the lower -> mixed mapping of the file's full path */
     data.p->pathCache.insert(lowerCase, mixedCase);
+
+    if (!data.dirStack.empty())
+      data.dirs[data.dirStack.top()].files.push_back(std::string(fname));
   }
 
   return PHYSFS_ENUM_OK;
 }
 
-void FileSystem::createPathCache() {
+static void stripEol(char *s) {
+  size_t len = strlen(s);
+  while (len > 0 && (s[len - 1] == '\n' || s[len - 1] == '\r'))
+    s[--len] = 0;
+}
+
+/* Rebuilds both maps from a cache file. Returns false and leaves the maps
+ * untouched if the file is missing, unreadable, of an unknown version, or if
+ * any recorded directory has changed since it was written. */
+static bool loadPathCacheFile(FileSystemPrivate *p) {
+  FILE *f = fopen(PATH_CACHE_FILE, "rb");
+  if (!f)
+    return false;
+
+  bool ok = false;
+  std::vector<DirCacheEntry> dirs;
+
+  do {
+    char line[1024];
+    if (!fgets(line, sizeof(line), f))
+      break;
+    if (strncmp(line, PATH_CACHE_MAGIC, strlen(PATH_CACHE_MAGIC)) != 0)
+      break;
+
+    long nDirs = 0;
+    if (!fgets(line, sizeof(line), f) || sscanf(line, "%ld", &nDirs) != 1)
+      break;
+    if (nDirs < 0 || nDirs > 100000)
+      break;
+
+    /* Parsed line by line, never with scanf: in a scanf format a literal tab
+     * matches ANY run of whitespace, newlines included, so on the game root
+     * entry -- whose path is empty -- it would swallow the following line. */
+    bool bad = false;
+    for (long i = 0; i < nDirs && !bad; ++i) {
+      if (!fgets(line, sizeof(line), f)) {
+        bad = true;
+        break;
+      }
+      stripEol(line);
+
+      /* <modtime> TAB <nfiles> TAB <path>, path possibly empty */
+      char *tab1 = strchr(line, '\t');
+      if (!tab1) {
+        bad = true;
+        break;
+      }
+      char *tab2 = strchr(tab1 + 1, '\t');
+      if (!tab2) {
+        bad = true;
+        break;
+      }
+      *tab1 = 0;
+      *tab2 = 0;
+
+      DirCacheEntry entry;
+      entry.modtime = (PHYSFS_sint64)atoll(line);
+      long nFiles = atol(tab1 + 1);
+      entry.mixedPath = tab2 + 1;
+
+      if (nFiles < 0 || nFiles > 1000000) {
+        bad = true;
+        break;
+      }
+
+      for (long j = 0; j < nFiles; ++j) {
+        if (!fgets(line, sizeof(line), f)) {
+          bad = true;
+          break;
+        }
+        stripEol(line);
+        entry.files.push_back(std::string(line));
+      }
+      if (bad)
+        break;
+      dirs.push_back(entry);
+    }
+    if (bad)
+      break;
+
+    /* Every recorded directory must still exist, still be a directory, and
+     * still have the same mtime. The game root is skipped: creating the cache
+     * file itself changes its mtime. */
+    for (size_t i = 0; i < dirs.size(); ++i) {
+      if (dirs[i].mixedPath.empty())
+        continue;
+      PHYSFS_Stat st;
+      if (!PHYSFS_stat(dirs[i].mixedPath.c_str(), &st)) {
+        bad = true;
+        break;
+      }
+      if (st.filetype != PHYSFS_FILETYPE_DIRECTORY ||
+          st.modtime != dirs[i].modtime) {
+        bad = true;
+        break;
+      }
+    }
+    if (bad)
+      break;
+
+    ok = true;
+  } while (0);
+
+  fclose(f);
+
+  if (!ok)
+    return false;
+
+  for (size_t i = 0; i < dirs.size(); ++i) {
+    const DirCacheEntry &entry = dirs[i];
+    std::string dirLower = entry.mixedPath;
+    strTolower(dirLower);
+
+    /* creates the entry even for directories holding no files, which is what
+     * a fresh scan does too */
+    std::vector<std::string> &list = p->fileLists[dirLower];
+
+    for (size_t j = 0; j < entry.files.size(); ++j) {
+      std::string mixed = entry.mixedPath.empty()
+                              ? entry.files[j]
+                              : entry.mixedPath + "/" + entry.files[j];
+      std::string lower = mixed;
+      strTolower(lower);
+      p->pathCache.insert(lower, mixed);
+
+      std::string nameLower = entry.files[j];
+      strTolower(nameLower);
+      list.push_back(nameLower);
+    }
+  }
+
+  return true;
+}
+
+static void savePathCacheFile(const std::vector<DirCacheEntry> &dirs) {
+  /* Written next to the game data, so it travels with the copy it describes.
+   * A failure here is not fatal: the cache is just rebuilt next time. */
+  FILE *f = fopen(PATH_CACHE_FILE, "wb");
+  if (!f)
+    return;
+
+  fprintf(f, "%s\n", PATH_CACHE_MAGIC);
+  fprintf(f, "%ld\n", (long)dirs.size());
+  for (size_t i = 0; i < dirs.size(); ++i) {
+    fprintf(f, "%lld\t%ld\t%s\n", (long long)dirs[i].modtime,
+            (long)dirs[i].files.size(), dirs[i].mixedPath.c_str());
+    for (size_t j = 0; j < dirs[i].files.size(); ++j)
+      fprintf(f, "%s\n", dirs[i].files[j].c_str());
+  }
+
+  fclose(f);
+}
+
+/* The actual scan: one PHYSFS_stat per file. */
+static void buildPathCache(FileSystemPrivate *p) {
   CacheEnumData data(p);
+
+  /* the game root, so that files sitting directly in it are recorded too */
+  DirCacheEntry root;
+  root.mixedPath = "";
+  root.modtime = 0;
+  data.dirs.push_back(root);
+  data.dirStack.push(0);
+
   data.fileLists.push(&p->fileLists[""]);
   PHYSFS_enumerate("", cacheEnumCB, &data);
+
+  savePathCacheFile(data.dirs);
+}
+
+void FileSystem::createPathCache() {
+  if (!loadPathCacheFile(p)) {
+    p->fileLists.clear();
+    p->pathCache.clear();
+    buildPathCache(p);
+  }
 
   p->havePathCache = true;
 }
 
 void FileSystem::reloadPathCache() {
     if (!p->havePathCache) return;
-    
+
     p->fileLists.clear();
     p->pathCache.clear();
-    createPathCache();
+    /* an explicit reload must not trust the file on disk */
+    buildPathCache(p);
 }
 
 struct FontSetsCBData {
