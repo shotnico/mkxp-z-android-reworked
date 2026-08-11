@@ -78,6 +78,12 @@ public class MainActivity extends SDLActivity
     private View mPannello;
     private ImageView mBottoneImpostazioni;
 
+    // Sfondo decorativo attorno alla scena di gioco (effetto console portatile).
+    // @drawable/bg_console, in due versioni scelte da Android in base
+    // all'orientamento: verticale in res/drawable-nodpi/, orizzontale in
+    // res/drawable-land-nodpi/.
+    private ImageView mSfondo;
+
     // Schermata iniziale: quanto resta a schermo. Non aggiunge attesa, il gioco
     // sta caricando sotto per tutto questo tempo.
     // L'immagine e' @drawable/schermata_iniziale e ne esistono DUE versioni,
@@ -215,6 +221,7 @@ public class MainActivity extends SDLActivity
 
         if (mLayout != null) {
             applySurfaceLayout();          // in verticale mette il gioco in alto
+            addSfondo();                   // va aggiunto PRIMA di tutto il resto
             mGamepad.attachTo(this, mLayout);
             // Il tasto dell'ingranaggio resta a schermo per tutta la partita: le
             // impostazioni si aprono da li'. Aggiunto prima della schermata
@@ -222,6 +229,67 @@ public class MainActivity extends SDLActivity
             addPulsanteImpostazioni();
             showSplash();
         }
+    }
+
+    /**
+     * Sfondo decorativo attorno alla scena: effetto console portatile.
+     *
+     * PERCHE' FUNZIONA. La scena di gioco e' una SurfaceView, e una SurfaceView
+     * non viene disegnata dentro la finestra: sta SOTTO, e la finestra viene resa
+     * trasparente nella sua area. Di conseguenza tutto quello che sta dietro di
+     * lei nella gerarchia -- come questa immagine, aggiunta come PRIMO figlio --
+     * si vede soltanto FUORI dalla zona del gioco. La scena non puo' mai essere
+     * coperta dal disegno, qualunque cosa il disegno contenga in quell'area.
+     * E' anche il motivo per cui l'immagine orizzontale funziona pur avendo il
+     * pannello destro che sborda di 42 px dentro la zona di gioco: quei pixel
+     * finiscono dietro la scena e non si vedono.
+     *
+     * COME VIENE POSIZIONATA. Le immagini sono disegnate a schermo pieno
+     * (1080x2340 e 2340x1080, o comunque nelle stesse proporzioni), quindi vanno
+     * mappate sullo SCHERMO, non sul layout: il layout parte sotto la barra di
+     * stato, e usare le sue misure sposterebbe tutto in alto di ~100 px. Percio'
+     * la view viene dimensionata quanto lo schermo intero e spostata indietro dei
+     * margini di sistema, che si leggono a runtime con getLocationOnScreen. La
+     * parte che finisce sotto la barra di stato viene tagliata dal layout.
+     */
+    private void addSfondo()
+    {
+        try {
+            mSfondo = new ImageView(this);
+            mSfondo.setScaleType(ImageView.ScaleType.FIT_XY);
+            mSfondo.setImageResource(R.drawable.bg_console);
+            mLayout.addView(mSfondo, 0);   // primo figlio = dietro a tutto
+            posizionaSfondo();
+        } catch (Exception e) {
+            Log.w(TAG, "Sfondo non aggiunto: " + e);
+        }
+    }
+
+    private void posizionaSfondo()
+    {
+        if (mSfondo == null || mLayout == null)
+            return;
+        // dopo il layout: prima di allora getLocationOnScreen non sa ancora dove
+        // si trova il layout e i margini di sistema risulterebbero zero
+        mLayout.post(new Runnable() {
+            @Override public void run() {
+                try {
+                    android.util.DisplayMetrics dm = new android.util.DisplayMetrics();
+                    getWindowManager().getDefaultDisplay().getRealMetrics(dm);
+                    int[] pos = new int[2];
+                    mLayout.getLocationOnScreen(pos);
+
+                    RelativeLayout.LayoutParams p =
+                            new RelativeLayout.LayoutParams(dm.widthPixels, dm.heightPixels);
+                    p.leftMargin = -pos[0];
+                    p.topMargin = -pos[1];
+                    mSfondo.setLayoutParams(p);
+                    mSfondo.setImageResource(R.drawable.bg_console);  // versione dell'orientamento attuale
+                } catch (Exception e) {
+                    Log.w(TAG, "Sfondo non posizionato: " + e);
+                }
+            }
+        });
     }
 
     /**
@@ -655,6 +723,7 @@ public class MainActivity extends SDLActivity
             applySurfaceLayout();          // la superficie va rimessa a posto per il nuovo orientamento
             applyPanelLayout();            // e anche il pannello: cambia zona e misura
             posizionaIngranaggio();        // in verticale va sotto il gioco, in orizzontale in alto
+            posizionaSfondo();             // e lo sfondo cambia versione e misure
             mGamepad.detach();
             mGamepad.attachTo(this, mLayout);
             mGamepad.setInputEnabled(mPannello == null);
