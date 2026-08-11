@@ -472,9 +472,32 @@ public class MainActivity extends SDLActivity
      * della superficie provoca un surfaceChanged, che SDL e mkxp-z gestiscono da
      * soli: essendo la superficie gia' 4:3, non c'e' piu' niente da centrare.
      *
-     * In orizzontale si torna a schermo pieno.
+     * ANCHE IN ORIZZONTALE la superficie viene ridotta al 4:3 e centrata, e non
+     * lasciata a schermo pieno. Non e' una questione estetica: una SurfaceView
+     * BUCA la finestra nella propria area, cioe' tutto quello che le sta dietro
+     * -- compreso lo sfondo decorativo -- non viene disegnato li'. Con la
+     * superficie a schermo pieno lo sfondo era invisibile in orizzontale, e le
+     * bande nere ai lati non erano spazio libero del layout ma il letterbox
+     * interno di mkxp-z. Riducendola, quelle bande diventano spazio del layout e
+     * lo sfondo si vede.
+     *
+     * La scena non cambia dimensione: era gia' 1440x1080 dentro una superficie
+     * piu' larga, e ora la superficie coincide con lei.
      */
     private void applySurfaceLayout()
+    {
+        applicaMisureSuperficie();
+        /* Di nuovo dopo il layout: in onCreate mLayout non e' ancora misurato e
+         * alla rotazione riporta ancora l'altezza vecchia. La seconda passata usa
+         * il valore reale; la guardia dentro applicaMisureSuperficie evita che
+         * un nuovo setLayoutParams inneschi un ciclo di layout senza fine. */
+        if (mLayout != null)
+            mLayout.post(new Runnable() {
+                @Override public void run() { applicaMisureSuperficie(); }
+            });
+    }
+
+    private void applicaMisureSuperficie()
     {
         if (mLayout == null || mSurface == null)
             return;
@@ -483,17 +506,31 @@ public class MainActivity extends SDLActivity
             boolean verticale = getResources().getConfiguration().orientation
                                 == Configuration.ORIENTATION_PORTRAIT;
 
-            RelativeLayout.LayoutParams p;
+            int larghezza, altezza, regola;
             if (verticale) {
-                int w = getResources().getDisplayMetrics().widthPixels;
-                p = new RelativeLayout.LayoutParams(
-                        RelativeLayout.LayoutParams.MATCH_PARENT, w * 3 / 4);
-                p.addRule(RelativeLayout.ALIGN_PARENT_TOP);
+                int w = (mLayout.getWidth() > 0)
+                        ? mLayout.getWidth()
+                        : getResources().getDisplayMetrics().widthPixels;
+                larghezza = RelativeLayout.LayoutParams.MATCH_PARENT;
+                altezza = w * 3 / 4;
+                regola = RelativeLayout.ALIGN_PARENT_TOP;
             } else {
-                p = new RelativeLayout.LayoutParams(
-                        RelativeLayout.LayoutParams.MATCH_PARENT,
-                        RelativeLayout.LayoutParams.MATCH_PARENT);
+                int h = (mLayout.getHeight() > 0)
+                        ? mLayout.getHeight()
+                        : getResources().getDisplayMetrics().heightPixels;
+                larghezza = h * 4 / 3;
+                altezza = RelativeLayout.LayoutParams.MATCH_PARENT;
+                regola = RelativeLayout.CENTER_HORIZONTAL;
             }
+
+            ViewGroup.LayoutParams attuali = mSurface.getLayoutParams();
+            if (attuali != null && attuali.width == larghezza
+                    && attuali.height == altezza)
+                return;                     // gia' a posto: non ritoccare
+
+            RelativeLayout.LayoutParams p =
+                    new RelativeLayout.LayoutParams(larghezza, altezza);
+            p.addRule(regola);
             mSurface.setLayoutParams(p);
         } catch (Exception e) {
             Log.w(TAG, "Layout della superficie non applicato: " + e);
