@@ -700,6 +700,31 @@ public class MainActivity extends SDLActivity
      * Quello che viene sospeso e' l'invio dei tasti, cosi' regolare l'opacita' non
      * fa camminare il personaggio.
      */
+    /**
+     * Chiede al gioco di aprire la sua schermata Opzioni.
+     *
+     * Il pannello e' codice Android e non puo' chiamare Ruby: il ponte e' un
+     * file vuoto nella cartella del gioco. android_boot.rb lo controlla due
+     * volte al secondo, lo cancella e apre PokemonOption_Scene con la stessa
+     * sequenza che usa il menu di pausa.
+     *
+     * Ritorna false se il file non si riesce a creare, cosi' il pannello puo'
+     * dirlo invece di chiudersi facendo finta di niente.
+     */
+    private boolean chiediOpzioniDiGioco()
+    {
+        try {
+            String cartella = GameFolder.resolve();
+            if (cartella == null || cartella.isEmpty())
+                return false;
+            File segnale = new File(cartella, ".apri_opzioni");
+            return segnale.exists() || segnale.createNewFile();
+        } catch (Exception e) {
+            Log.w(TAG, "Richiesta di aprire le opzioni non riuscita: " + e);
+            return false;
+        }
+    }
+
     private void showSettingsPanel()
     {
         if (mPannello != null)        // gia' aperto
@@ -720,6 +745,28 @@ public class MainActivity extends SDLActivity
             if (chiudi != null) {
                 chiudi.setOnClickListener(new View.OnClickListener() {
                     @Override public void onClick(View v) { closeSettingsPanel(); }
+                });
+            }
+
+            // --- AUDIO: apre le Opzioni del GIOCO -----------------------------
+            // Musica ed effetti hanno gia' un'impostazione dentro Essentials,
+            // salvata nella partita: qui non si duplica, ci si arriva. Il
+            // pannello e' codice Android e non puo' chiamare Ruby, quindi il
+            // ponte e' un file: lo si crea, e android_boot.rb lo raccoglie
+            // entro mezzo secondo e apre la schermata (solo sulla mappa: durante
+            // una lotta interromperebbe l'interprete degli eventi).
+            View opzioni = mPannello.findViewById(R.id.open_game_options);
+            if (opzioni != null) {
+                opzioni.setOnClickListener(new View.OnClickListener() {
+                    @Override public void onClick(View v) {
+                        if (chiediOpzioniDiGioco()) {
+                            closeSettingsPanel();
+                        } else {
+                            Toast.makeText(MainActivity.this,
+                                    R.string.audio_only_on_map,
+                                    Toast.LENGTH_SHORT).show();
+                        }
+                    }
                 });
             }
 

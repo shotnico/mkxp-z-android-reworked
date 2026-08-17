@@ -25,6 +25,12 @@
     <string name="lang_missing">Pacchetto della lingua non trovato sul telefono.</string>
     <string name="lang_switched">Lingua cambiata. Chiudi e riapri l\'app per applicarla.</string>
 
+    <!-- Audio -->
+    <string name="audio_title">Audio</string>
+    <string name="audio_open_options">Apri le Opzioni del gioco</string>
+    <string name="audio_hint">Volume di musica ed effetti, velocita\' del testo e altro. Le impostazioni restano salvate nella partita.</string>
+    <string name="audio_only_on_map">Si apre dalla mappa: chiudi prima dialoghi e lotte.</string>
+
     <!-- Stato -->
     <string name="status_no_permission">Serve il permesso «Accesso a tutti i file».</string>
     <string name="status_no_game">Cartella del gioco non trovata in /FireAshITA né /mkxp-z.</string>

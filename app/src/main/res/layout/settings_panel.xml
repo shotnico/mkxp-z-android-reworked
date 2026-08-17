@@ -112,6 +112,39 @@
             tools:ignore="UnusedAttribute"
         />
 
+        <!-- ============ Audio: si apre la schermata del GIOCO ============
+             Musica ed effetti hanno gia' un'impostazione dentro Pokemon
+             Essentials, salvata nella partita. Un cursore qui avrebbe creato una
+             seconda manopola scollegata dalla prima, e due manopole per la
+             stessa cosa sono peggio di nessuna. Questo tasto porta a quella
+             vera, senza dover passare dal menu di pausa. -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/audio_title"
+            android:textColor="#F5F5F5"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:paddingTop="16dp"
+        />
+
+        <Button
+            android:id="@+id/open_game_options"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/audio_open_options"
+            android:textSize="13sp"
+        />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/audio_hint"
+            android:textColor="#9AA3B2"
+            android:textSize="11sp"
+            android:paddingBottom="4dp"
+        />
+
         <!-- ===================== Lingua ===================== -->
         <TextView
             android:layout_width="match_parent"
