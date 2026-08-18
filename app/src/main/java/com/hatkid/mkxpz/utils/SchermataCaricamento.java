@@ -222,17 +222,25 @@ public class SchermataCaricamento
         d.setFilterBitmap(false);   // disegni a pixel: meglio nitidi che sfumati
         mImmagine.setImageDrawable(d);
 
-        // riempie l'ALTEZZA: la larghezza in eccesso e' lo spazio in cui scorre
+        // Riempie l'ALTEZZA e ingrandisce ancora un po': e' la parte "zoomata sul
+        // centro". Il Pokemon sta al centro dell'immagine, quindi l'inquadratura
+        // parte da li'.
         final float scala = Math.max((float) vh / bmp.getHeight(),
-                                     (float) vw / bmp.getWidth());
+                                     (float) vw / bmp.getWidth()) * 1.12f;
         final float largaDavvero = bmp.getWidth() * scala;
-        final float corsa = Math.max(0f, largaDavvero - vw);
-        // si parte da un capo e si arriva all'altro, ma senza toccare i bordi:
-        // un bordo che entra nell'inquadratura fa vedere il trucco
-        final float bordo = Math.min(corsa * 0.10f, 120f);
+        final float eccedenza = Math.max(0f, largaDavvero - vw);
+        final float centro = -eccedenza / 2f;
+
+        // QUANTO SCORRE, e perche' non da un capo all'altro. Le immagini sono
+        // larghe 3072 px: attraversarle tutte porterebbe il Pokemon fuori
+        // dall'inquadratura per la meta' del tempo -- si vedeva nella prova a
+        // tre fotogrammi. Quindi si scorre di mezza larghezza di schermo intorno
+        // al centro: su 79 secondi sono circa 7 px al secondo, il soggetto non
+        // esce mai e il movimento si nota solo se lo guardi.
+        final float corsa = Math.min(eccedenza, vw * 0.5f);
         final boolean versoSinistra = mCaso.nextBoolean();
-        final float da = versoSinistra ? -(bordo) : -(corsa - bordo);
-        final float a  = versoSinistra ? -(corsa - bordo) : -(bordo);
+        final float da = centro + (versoSinistra ? corsa / 2f : -corsa / 2f);
+        final float a  = centro + (versoSinistra ? -corsa / 2f : corsa / 2f);
         final float dy = (vh - bmp.getHeight() * scala) / 2f;
 
         final Matrix m = new Matrix();
