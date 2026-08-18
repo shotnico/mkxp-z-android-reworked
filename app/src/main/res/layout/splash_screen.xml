@@ -1,19 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Schermata iniziale mostrata per qualche secondo appena si apre l'app.
+    Schermata di caricamento, mostrata da quando si apre l'app fino a quando il
+    gioco disegna il suo primo fotogramma.
 
-    A cosa serve: l'avvio richiede circa un minuto e mezzo, di cui la prima parte
-    e' tempo in cui mkxp-z non presenta ancora nulla. Questa immagine copre quei
-    secondi con qualcosa da guardare, mentre SOTTO il gioco sta gia' caricando:
-    non aggiunge attesa, la occupa.
+    QUANTO DURA DAVVERO L'ATTESA (misurato, non stimato). Dopo ogni copia dei
+    dati l'indice dei percorsi va ricostruito: il processo parte, e 79 secondi
+    dopo mkxp-z finisce di scrivere .mkxp_pathcache. In quei 79 secondi il gioco
+    NON disegna niente. La versione precedente di questa schermata durava 4,5
+    secondi fissi: copriva i primi 4 e lasciava 75 secondi di nero, che e'
+    esattamente il momento in cui uno crede che l'app sia bloccata.
+    Negli avvii normali l'indice c'e' gia' e il gioco parte in circa 2 secondi.
 
-    Perche' funziona: e' una View Android, quindi si disegna subito e non passa
-    dalla presentazione di mkxp-z, che in quella fase non mostra niente.
+    PERCHE' NON C'E' PIU' UN TIMER FISSO. La schermata resta finche' il gioco non
+    dice di essere pronto (scrive il file .gioco_pronto, vedi android_boot.rb).
+    Un timer fisso non puo' andare bene per due attese che stanno fra 2 e 80
+    secondi: o taglia troppo presto o fa aspettare chi non deve.
 
-    L'immagine e' 941x1672, cioe' verticale. scaleType="fitCenter" la mostra
-    intera senza tagliarla: in verticale riempie quasi tutto, in orizzontale
-    resta al centro con due bande nere ai lati. Preferito a centerCrop perche'
-    tagliare una schermata di titolo significa perderne il titolo.
+    IMMAGINI E SUGGERIMENTI STANNO SUL TELEFONO, NON QUI DENTRO. Cartella
+    caricamento\ dentro la cartella del gioco: le immagini si aggiungono con un
+    copia-incolla e non serve ricompilare l'APK. E' anche l'unico modo corretto:
+    disegni del gioco dentro l'APK sarebbero materiale di Nintendo dentro un
+    pacchetto ridistribuibile.
+
+    L'immagine e' scaleType="matrix": la matrice viene calcolata a mano per
+    riempire l'altezza e la larghezza in eccesso e' lo spazio in cui scorre.
+    Con centerCrop non si potrebbe: spostare la vista lascerebbe una banda nera,
+    perche' si muoverebbe la finestra invece del contenuto.
 -->
 <FrameLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
@@ -28,22 +40,64 @@
         android:id="@+id/splash_image"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:scaleType="fitCenter"
-        android:src="@drawable/schermata_iniziale"
+        android:scaleType="matrix"
         android:contentDescription="@string/app_name"
     />
 
-    <TextView
-        android:id="@+id/splash_hint"
+    <!-- Sfumatura scura in basso: i suggerimenti e la barra stanno sopra
+         l'immagine, e su un cielo chiaro il testo bianco sparirebbe. -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="220dp"
+        android:layout_gravity="bottom"
+        android:background="@drawable/sfumatura_caricamento"
+    />
+
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        android:gravity="center"
-        android:paddingBottom="18dp"
-        android:text="@string/splash_hint"
-        android:textColor="#CFD6E4"
-        android:textSize="12sp"
-        android:shadowColor="#000000"
-        android:shadowRadius="6"
-    />
+        android:orientation="vertical"
+        android:paddingLeft="24dp"
+        android:paddingRight="24dp"
+        android:paddingBottom="28dp"
+    >
+        <TextView
+            android:id="@+id/splash_suggerimento"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="56dp"
+            android:gravity="bottom|start"
+            android:textColor="#F2F5FA"
+            android:textSize="14sp"
+            android:lineSpacingExtra="3dp"
+            android:shadowColor="#000000"
+            android:shadowRadius="8"
+            android:shadowDx="0"
+            android:shadowDy="2"
+        />
+
+        <ProgressBar
+            android:id="@+id/splash_barra"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="8dp"
+            android:layout_marginTop="12dp"
+            android:max="1000"
+            android:progress="0"
+            android:progressDrawable="@drawable/barra_caricamento"
+        />
+
+        <TextView
+            android:id="@+id/splash_hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/splash_hint"
+            android:textColor="#AEB7C6"
+            android:textSize="11sp"
+            android:shadowColor="#000000"
+            android:shadowRadius="6"
+        />
+    </LinearLayout>
 </FrameLayout>

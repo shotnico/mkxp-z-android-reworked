@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Da trasparente a quasi nero: serve a rendere leggibili suggerimenti e barra
+     anche quando l'immagine sotto e' un cielo chiaro. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:angle="90"
+        android:startColor="#E6000000"
+        android:centerColor="#96000000"
+        android:endColor="#00000000"
+        android:type="linear" />
+</shape>

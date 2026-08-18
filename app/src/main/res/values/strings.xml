@@ -4,7 +4,7 @@
     <string name="app_name">Pokémon Fire Ash ITA</string>
 
     <!-- Schermata iniziale -->
-    <string name="splash_hint">Caricamento in corso…</string>
+    <string name="splash_hint">Il gioco sta caricando. Il primo avvio dopo un aggiornamento dei dati richiede circa un minuto e mezzo: da lì in poi bastano due secondi.</string>
 
     <!-- Impostazioni, aperte in gioco dal tasto con l'ingranaggio -->
     <string name="settings_title">Impostazioni</string>

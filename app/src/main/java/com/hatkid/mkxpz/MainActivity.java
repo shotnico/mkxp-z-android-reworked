@@ -38,6 +38,7 @@ import java.io.File;
 import org.libsdl.app.SDLActivity;
 import com.hatkid.mkxpz.gamepad.Gamepad;
 import com.hatkid.mkxpz.gamepad.GamepadConfig;
+import com.hatkid.mkxpz.utils.SchermataCaricamento;
 import com.hatkid.mkxpz.utils.GameFolder;
 
 public class MainActivity extends SDLActivity
@@ -85,14 +86,14 @@ public class MainActivity extends SDLActivity
     // res/drawable-land-nodpi/.
     private ImageView mSfondo;
 
-    // Schermata iniziale: quanto resta a schermo. Non aggiunge attesa, il gioco
-    // sta caricando sotto per tutto questo tempo.
-    // L'immagine e' @drawable/schermata_iniziale e ne esistono DUE versioni,
-    // scelte da Android in base all'orientamento: quella verticale in
-    // res/drawable-nodpi/ e quella orizzontale in res/drawable-land-nodpi/.
-    private static final long SPLASH_MS = 4500;
-    private static final long SPLASH_FADE_MS = 600;
+    // Schermata di caricamento. Non c'e' piu' una durata fissa: resta a schermo
+    // finche' il gioco non scrive .gioco_pronto, perche' l'attesa vera sta fra 2
+    // secondi (avvio normale) e 79 (misurati: ricostruzione dell'indice dei
+    // percorsi dopo una copia dei dati). Il resto sta in
+    // utils/SchermataCaricamento, che sceglie l'immagine, la fa scorrere e
+    // muove la barra.
     private View mSplash;
+    private SchermataCaricamento mCaricamento;
 
     // Frazione della larghezza occupata dal pannello impostazioni in orizzontale.
     // Meno di 1 perche' i tasti ai lati devono restare visibili: sono l'anteprima.
@@ -472,46 +473,57 @@ public class MainActivity extends SDLActivity
     }
 
     /**
-     * Mostra schermata_iniziale.png per qualche secondo, poi la sfuma via
-     * lasciando le impostazioni.
+     * Mostra la schermata di caricamento e la tiene finche' il gioco non dice di
+     * essere pronto.
      *
-     * Non allunga l'avvio di un secondo: il thread SDL sta gia' caricando il gioco
-     * mentre l'immagine e' a schermo. Copre la parte di attesa in cui prima si
-     * vedeva solo nero.
+     * Non allunga l'avvio di un secondo: il thread SDL sta caricando il gioco per
+     * tutto il tempo in cui l'immagine e' a schermo. Copre l'attesa in cui prima
+     * si vedeva solo nero -- 75 secondi di nero, al primo avvio dopo una copia
+     * dei dati.
      */
     private void showSplash()
     {
         try {
             mSplash = getLayoutInflater().inflate(R.layout.splash_screen, mLayout, false);
             mLayout.addView(mSplash);
+            mCaricamento = new SchermataCaricamento(
+                    this, mSplash, GAME_PATH,
+                    getSharedPreferences(GamepadConfig.PREFS, MODE_PRIVATE));
 
-            // Un tocco la salta: se uno ha gia' visto l'immagine non deve subirla.
+            // Un tocco la salta, ma SOLO se il gioco e' gia' pronto: prima,
+            // saltarla scoprirebbe lo schermo nero che serviva a coprire.
             mSplash.setOnClickListener(new View.OnClickListener() {
-                @Override public void onClick(View v) { hideSplash(); }
+                @Override public void onClick(View v)
+                {
+                    if (mCaricamento != null && !mCaricamento.saltaSePossibile())
+                        Log.i(TAG, "tocco sulla schermata: il gioco non e' ancora pronto");
+                }
             });
 
-            new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                @Override public void run() { hideSplash(); }
-            }, SPLASH_MS);
+            mCaricamento.avvia(new Runnable() {
+                @Override public void run() { togliSplash(); }
+            });
         } catch (Exception e) {
-            Log.w(TAG, "Schermata iniziale non mostrata: " + e);
+            Log.w(TAG, "Schermata di caricamento non mostrata: " + e);
         }
     }
 
+    /** Chiude subito, senza aspettare il segnale del gioco. */
     private void hideSplash()
     {
-        final View s = mSplash;
-        if (s == null)
-            return;
-        mSplash = null;                      // niente doppie chiamate da tocco + timer
+        if (mCaricamento != null)
+            mCaricamento.chiudiSubito();
+        else
+            togliSplash();
+    }
 
-        s.animate().alpha(0f).setDuration(SPLASH_FADE_MS)
-         .withEndAction(new Runnable() {
-             @Override public void run() {
-                 if (s.getParent() instanceof ViewGroup)
-                     ((ViewGroup) s.getParent()).removeView(s);
-             }
-         }).start();
+    private void togliSplash()
+    {
+        final View s = mSplash;
+        mSplash = null;
+        mCaricamento = null;
+        if (s != null && s.getParent() instanceof ViewGroup)
+            ((ViewGroup) s.getParent()).removeView(s);
     }
 
     /**
