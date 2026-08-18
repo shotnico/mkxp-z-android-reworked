@@ -177,8 +177,9 @@ public class SchermataCaricamento
     private List<File> segnaliPossibili()
     {
         List<File> c = new ArrayList<File>();
-        if (mCartellaGioco != null)
-            c.add(new File(mCartellaGioco, SEGNALE_PRONTO));
+        File gioco = cartellaGioco();
+        if (gioco != null)
+            c.add(new File(gioco, SEGNALE_PRONTO));
         try {
             File propria = mAtt.getExternalFilesDir(null);
             if (propria != null)
@@ -285,17 +286,38 @@ public class SchermataCaricamento
     }
 
     /**
-     * Le cartelle dove cercare, in ordine. Sono due perche' la prima prova ha
-     * dato una risposta che non tornava: dal lato Java la cartella del gioco
-     * risultava vuota, mentre il Ruby dentro LO STESSO PROCESSO ci leggeva 11
-     * file. Quindi la cartella privata dell'app fa da riserva: li' l'accesso non
-     * dipende da come Android filtra la vista di /sdcard.
+     * La cartella del gioco, RISOLTA ADESSO.
+     *
+     * IL DIFETTO CHE HA COSTATO UNA PROVA. Questa schermata riceveva il percorso
+     * che MainActivity ha in mano, ma quando parte quel percorso e' ancora il
+     * valore predefinito: GAME_PATH viene risolto piu' tardi, in
+     * runSDLThread(). Risultato, nel log: "cartella
+     * /storage/emulated/0/FireAshITA/caricamento esiste=false". Cercava in una
+     * cartella che non esiste, mentre le immagini erano in mkxp-z.
+     * Quindi qui si chiede a GameFolder, che guarda quale cartella contiene
+     * davvero la cartella Data -- la stessa domanda, fatta al momento giusto.
+     */
+    private File cartellaGioco()
+    {
+        try {
+            String g = GameFolder.resolve();
+            if (g != null)
+                return new File(g);
+        } catch (Exception e) { /* si prova col percorso ricevuto */ }
+        return mCartellaGioco;
+    }
+
+    /**
+     * Dove cercare, in ordine: la cartella del gioco e, come riserva, quella
+     * privata dell'app. La riserva serve perche' l'accesso a /sdcard dipende da
+     * come Android lo filtra, mentre alla propria un'app entra sempre.
      */
     private List<File> cartelleCandidate()
     {
         List<File> c = new ArrayList<File>();
-        if (mCartellaGioco != null)
-            c.add(new File(mCartellaGioco, CARTELLA));
+        File gioco = cartellaGioco();
+        if (gioco != null)
+            c.add(new File(gioco, CARTELLA));
         try {
             File propria = mAtt.getExternalFilesDir(null);
             if (propria != null)
@@ -329,11 +351,12 @@ public class SchermataCaricamento
                                    || n.endsWith(".jpeg") || n.endsWith(".webp");
                 if (!immagine)
                     continue;
-                // NON si filtra piu' su isFile(): se Android nasconde i metadati
-                // di un file, isFile() risponde false anche quando il file c'e'
-                // e si apre benissimo. Era il candidato numero uno per il difetto
-                // della prima prova, e comunque un controllo che non serve:
-                // se poi non si apre, se ne accorge chi decodifica.
+                // Niente isFile(): non e' un controllo che serve -- se il file
+                // non si apre se ne accorge chi decodifica -- e una domanda in
+                // meno e' una risposta sbagliata in meno.
+                // (Per la cronaca: avevo incolpato isFile() del difetto della
+                // prima prova. Non era lui: era la cartella sbagliata, vedi
+                // cartellaGioco(). Il log lo ha detto, il sospetto no.)
                 Log.i(TAG, "   trovata " + f.getName() + " (" + f.length() + " byte)");
                 file.add(f);
             }
@@ -389,8 +412,9 @@ public class SchermataCaricamento
     private void caricaFrasi()
     {
         mFrasi.clear();
-        // si prova ad APRIRLO, senza chiedere prima se esiste: nella prima prova
-        // i controlli sui metadati rispondevano di no su file che poi si leggono
+        // si prova ad APRIRLO invece di chiedere prima se esiste: se non c'e',
+        // l'eccezione lo dice, e con quale percorso -- che e' proprio il dato
+        // che serviva per trovare il difetto della prima prova
         for (File dir : cartelleCandidate()) {
             File f = new File(dir, SUGGERIMENTI);
             BufferedReader r = null;
