@@ -25,11 +25,12 @@
     <string name="lang_missing">Pacchetto della lingua non trovato sul telefono.</string>
     <string name="lang_switched">Lingua cambiata. Chiudi e riapri l\'app per applicarla.</string>
 
-    <!-- Audio -->
-    <string name="audio_title">Audio</string>
-    <string name="audio_open_options">Apri le Opzioni del gioco</string>
-    <string name="audio_hint">Volume di musica ed effetti, velocita\' del testo e altro. Le impostazioni restano salvate nella partita.</string>
-    <string name="audio_only_on_map">Si apre dalla mappa: chiudi prima dialoghi e lotte.</string>
+    <!-- Opzioni del gioco. Si chiamavano "Audio": nome sbagliato, perche\'
+         da qui si arriva a tutte le opzioni del gioco, non solo al volume. -->
+    <string name="game_options_title">Opzioni del gioco</string>
+    <string name="game_options_open">APRI LE OPZIONI DEL GIOCO</string>
+    <string name="game_options_hint">Volume di musica ed effetti, velocita\' del testo, efficacia delle mosse e tutto il resto. Questo pannello si chiude perche\' le Opzioni si aprono dentro il gioco, qui sotto.</string>
+    <string name="game_options_only_on_map">Si apre dalla mappa: chiudi prima dialoghi e lotte.</string>
 
     <!-- Stato -->
     <string name="status_no_permission">Serve il permesso «Accesso a tutti i file».</string>

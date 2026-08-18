@@ -763,7 +763,7 @@ public class MainActivity extends SDLActivity
                             closeSettingsPanel();
                         } else {
                             Toast.makeText(MainActivity.this,
-                                    R.string.audio_only_on_map,
+                                    R.string.game_options_only_on_map,
                                     Toast.LENGTH_SHORT).show();
                         }
                     }
