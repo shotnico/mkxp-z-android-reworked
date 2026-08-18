@@ -169,22 +169,39 @@ public class SchermataCaricamento
         } catch (Exception e) { /* niente: e' solo una comodita' */ }
     }
 
-    private File fileSegnale()
+    /**
+     * Dove puo' comparire il segnale. Il gioco lo scrive in tutte queste, e qui
+     * basta trovarlo in una: nella prima prova la schermata e' rimasta 200
+     * secondi perche' guardava solo nella cartella del gioco e non lo vedeva.
+     */
+    private List<File> segnaliPossibili()
     {
-        return (mCartellaGioco != null) ? new File(mCartellaGioco, SEGNALE_PRONTO) : null;
+        List<File> c = new ArrayList<File>();
+        if (mCartellaGioco != null)
+            c.add(new File(mCartellaGioco, SEGNALE_PRONTO));
+        try {
+            File propria = mAtt.getExternalFilesDir(null);
+            if (propria != null)
+                c.add(new File(propria, SEGNALE_PRONTO));
+        } catch (Exception e) { /* resta la prima */ }
+        return c;
     }
 
     private void cancellaSegnale()
     {
-        File f = fileSegnale();
-        if (f != null && f.exists() && !f.delete())
-            Log.w(TAG, "Non riesco a cancellare " + f);
+        for (File f : segnaliPossibili()) {
+            if (f.exists() && !f.delete())
+                Log.w(TAG, "non riesco a cancellare " + f.getAbsolutePath());
+        }
     }
 
     private boolean esistePronto()
     {
-        File f = fileSegnale();
-        return f != null && f.exists();
+        for (File f : segnaliPossibili()) {
+            if (f.exists())
+                return true;
+        }
+        return false;
     }
 
     private final Runnable mControllo = new Runnable() {
@@ -267,20 +284,61 @@ public class SchermataCaricamento
         mImmagine.setImageMatrix(m);
     }
 
+    /**
+     * Le cartelle dove cercare, in ordine. Sono due perche' la prima prova ha
+     * dato una risposta che non tornava: dal lato Java la cartella del gioco
+     * risultava vuota, mentre il Ruby dentro LO STESSO PROCESSO ci leggeva 11
+     * file. Quindi la cartella privata dell'app fa da riserva: li' l'accesso non
+     * dipende da come Android filtra la vista di /sdcard.
+     */
+    private List<File> cartelleCandidate()
+    {
+        List<File> c = new ArrayList<File>();
+        if (mCartellaGioco != null)
+            c.add(new File(mCartellaGioco, CARTELLA));
+        try {
+            File propria = mAtt.getExternalFilesDir(null);
+            if (propria != null)
+                c.add(new File(propria, CARTELLA));
+        } catch (Exception e) { /* niente: resta la prima */ }
+        return c;
+    }
+
     private Bitmap scegliImmagine()
     {
         List<File> file = new ArrayList<File>();
-        if (mCartellaGioco != null) {
-            File dir = new File(mCartellaGioco, CARTELLA);
+        boolean gestoreStorage = false;
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= 30)
+                gestoreStorage = android.os.Environment.isExternalStorageManager();
+        } catch (Exception e) { /* si sta senza */ }
+        Log.i(TAG, "accesso a tutti i file: " + gestoreStorage);
+
+        for (File dir : cartelleCandidate()) {
             File[] tutti = dir.listFiles();
-            if (tutti != null) {
-                for (File f : tutti) {
-                    String n = f.getName().toLowerCase();
-                    if (f.isFile() && (n.endsWith(".png") || n.endsWith(".jpg")
-                                       || n.endsWith(".jpeg") || n.endsWith(".webp")))
-                        file.add(f);
-                }
+            Log.i(TAG, "cartella " + dir.getAbsolutePath()
+                       + " esiste=" + dir.exists()
+                       + " cartella=" + dir.isDirectory()
+                       + " leggibile=" + dir.canRead()
+                       + " elenco=" + (tutti == null ? "null" : String.valueOf(tutti.length)));
+            if (tutti == null)
+                continue;
+            for (File f : tutti) {
+                String n = f.getName().toLowerCase();
+                boolean immagine = n.endsWith(".png") || n.endsWith(".jpg")
+                                   || n.endsWith(".jpeg") || n.endsWith(".webp");
+                if (!immagine)
+                    continue;
+                // NON si filtra piu' su isFile(): se Android nasconde i metadati
+                // di un file, isFile() risponde false anche quando il file c'e'
+                // e si apre benissimo. Era il candidato numero uno per il difetto
+                // della prima prova, e comunque un controllo che non serve:
+                // se poi non si apre, se ne accorge chi decodifica.
+                Log.i(TAG, "   trovata " + f.getName() + " (" + f.length() + " byte)");
+                file.add(f);
             }
+            if (!file.isEmpty())
+                break;
         }
         if (file.isEmpty()) {
             Log.i(TAG, "nessuna immagine in " + CARTELLA + ": resta quella dell'APK");
@@ -331,9 +389,10 @@ public class SchermataCaricamento
     private void caricaFrasi()
     {
         mFrasi.clear();
-        File f = (mCartellaGioco != null)
-                ? new File(new File(mCartellaGioco, CARTELLA), SUGGERIMENTI) : null;
-        if (f != null && f.isFile()) {
+        // si prova ad APRIRLO, senza chiedere prima se esiste: nella prima prova
+        // i controlli sui metadati rispondevano di no su file che poi si leggono
+        for (File dir : cartelleCandidate()) {
+            File f = new File(dir, SUGGERIMENTI);
             BufferedReader r = null;
             try {
                 r = new BufferedReader(new InputStreamReader(new FileInputStream(f), "UTF-8"));
@@ -343,11 +402,14 @@ public class SchermataCaricamento
                     if (riga.length() > 0 && !riga.startsWith("#"))
                         mFrasi.add(riga);
                 }
+                Log.i(TAG, "suggerimenti: " + mFrasi.size() + " da " + f.getAbsolutePath());
             } catch (Exception e) {
-                Log.w(TAG, "suggerimenti non letti: " + e);
+                Log.i(TAG, "suggerimenti non letti da " + f.getAbsolutePath() + ": " + e);
             } finally {
                 try { if (r != null) r.close(); } catch (Exception ignored) {}
             }
+            if (!mFrasi.isEmpty())
+                break;
         }
         Collections.shuffle(mFrasi, mCaso);   // ordine diverso a ogni avvio
     }
