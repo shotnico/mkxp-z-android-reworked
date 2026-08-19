@@ -18,6 +18,9 @@ jobs:
   build:
     name: Build APK
     runs-on: ubuntu-22.04
+    # Se qualcosa si appende si vuole saperlo subito: senza questo una corsa
+    # bloccata resta in piedi fino al limite di sei ore di GitHub. E' successo.
+    timeout-minutes: 40
 
     env:
       ANDROID_NDK_VERSION: 23.2.8568313
@@ -38,12 +41,27 @@ jobs:
           distribution: 'temurin'
 
       # ── 3. System dependencies ───────────────────────────────────────────────
+      # Questo passo si e' piantato due volte su tre il 19 agosto 2026: fermo
+      # qui dal primo minuto, e la corsa e' andata avanti a vuoto per SEI ORE
+      # (il limite di GitHub) prima di essere annullata a mano. Le altre volte
+      # ci metteva un minuto. Tre correzioni, tutte per non ripetere l'attesa:
+      #   - DEBIAN_FRONTEND=noninteractive: se un pacchetto fa una domanda, apt
+      #     aspetta una risposta che su un runner non arrivera' mai;
+      #   - ritenta e va in timeout invece di restare appeso a un mirror lento;
+      #   - via ruby-full: il Ruby lo installa il passo dopo con setup-ruby, e
+      #     ruby-full si porta dietro documentazione e Tk che qui non servono.
+      #     Meno pacchetti, meno cose che possono chiedere qualcosa.
+      # Il job ha anche un timeout (timeout-minutes): meglio fallire in quaranta
+      # minuti che occupare un runner per sei ore.
       - name: Install system dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
         run: |
-          sudo apt-get update -y
-          sudo apt-get install -y \
+          APT_OPT="-o Acquire::Retries=3 -o Acquire::http::Timeout=20"
+          sudo apt-get update -y $APT_OPT
+          sudo apt-get install -y --no-install-recommends $APT_OPT \
             build-essential cmake curl gpg xxd \
-            ruby-full autoconf automake libtool pkg-config \
+            autoconf automake libtool pkg-config \
             python3 git unzip
 
       # ── 4. Ruby  ──────────────────────────────────────
