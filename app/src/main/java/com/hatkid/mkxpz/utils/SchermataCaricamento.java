@@ -81,6 +81,23 @@ public class SchermataCaricamento
     private static final long DISSOLVENZA_MS = 600L;
     private static final int  QUASI = 920;      // su 1000: dove si fermerebbe
 
+    /** Ogni quanto cambia immagine. Scelta dell'utente: quattro secondi. */
+    private static final long CAMBIO_MS = 4000L;
+    /** Quanto dura il passaggio fra un'immagine e l'altra. */
+    private static final long DISSOLVENZA_IMG_MS = 700L;
+    /**
+     * Quanto scorre, in pixel di schermo al secondo.
+     *
+     * La prima versione muoveva "mezza larghezza di schermo sulla durata
+     * attesa": 540 px in 79 secondi, cioe' 7 px al secondo, e l'utente l'ha
+     * vista ferma. Una velocita' in px/s si legge e si cambia; una frazione
+     * della larghezza dipendeva da quanto era larga l'immagine e dava numeri
+     * diversi senza dirlo.
+     */
+    private static final float SPOSTAMENTO_PX_S = 45f;
+    /** Quanto si ingrandisce oltre il riempire l'altezza: lo "zoom sul centro". */
+    private static final float ZOOM = 1.12f;
+
     private final Activity mAtt;
     private final View mVista;
     private final File mCartellaGioco;
@@ -88,7 +105,13 @@ public class SchermataCaricamento
     private final Handler mMano = new Handler(Looper.getMainLooper());
     private final Random mCaso = new Random();
 
-    private ImageView mImmagine;
+    // due viste sovrapposte: si dissolve la nuova sopra quella in vista
+    private ImageView mVisibile;
+    private ImageView mNascosta;
+    private List<File> mFile = new ArrayList<File>();
+    private int mIndice = 0;
+    private boolean mPrima = true;
+    private boolean mVersoDestra = false;
     private ProgressBar mBarra;
     private TextView mSuggerimento;
     private ValueAnimator mScorrimento;
@@ -113,7 +136,9 @@ public class SchermataCaricamento
     {
         mAlTermine = alTermine;
         mInizio = SystemClock.elapsedRealtime();
-        mImmagine = (ImageView) mVista.findViewById(R.id.splash_image);
+        mVisibile = (ImageView) mVista.findViewById(R.id.splash_image);
+        mNascosta = (ImageView) mVista.findViewById(R.id.splash_image2);
+        mVersoDestra = mCaso.nextBoolean();   // da che parte comincia
         mBarra = (ProgressBar) mVista.findViewById(R.id.splash_barra);
         mSuggerimento = (TextView) mVista.findViewById(R.id.splash_suggerimento);
 
@@ -123,7 +148,7 @@ public class SchermataCaricamento
         avviaBarra(durataAttesa());
         // l'immagine si prepara quando la vista ha una misura: prima di allora
         // non si sa di quanto va ingrandita
-        mVista.post(new Runnable() { @Override public void run() { preparaImmagine(); } });
+        mVista.post(new Runnable() { @Override public void run() { prossimaImmagine(); } });
         mMano.postDelayed(mControllo, CONTROLLO_MS);
     }
 
@@ -225,64 +250,111 @@ public class SchermataCaricamento
         }
     };
 
-    // ----------------------------------------------------------------- immagine
+    // ----------------------------------------------------------------- immagini
 
-    private void preparaImmagine()
+    /**
+     * Mostra l'immagine successiva, dissolvendola sopra quella in vista, e
+     * riprogramma il cambio.
+     *
+     * PERCHE' UNA SEQUENZA E NON UNA SOLA IMMAGINE. La prima versione teneva la
+     * stessa immagine per tutto il caricamento e la faceva derivare di mezza
+     * larghezza di schermo sulla durata attesa: erano 7 px al secondo, e a
+     * schermo sembrava ferma. Ora l'immagine cambia ogni CAMBIO_MS e ogni cambio
+     * INVERTE la direzione, cosi' il movimento si vede anche in quattro secondi.
+     *
+     * Lo spostamento e' a velocita' fissa (SPOSTAMENTO_PX_S), non "una frazione
+     * della larghezza": una frazione dava velocita' diverse a seconda di quanto
+     * era larga l'immagine, e la lentezza che si vedeva non era quella che avevo
+     * calcolato.
+     */
+    private void prossimaImmagine()
     {
-        if (mImmagine == null || mChiusa) return;
-        final int vw = mImmagine.getWidth();
-        final int vh = mImmagine.getHeight();
-        if (vw <= 0 || vh <= 0) return;
-
-        Bitmap bmp = scegliImmagine();
-        if (bmp == null) return;
-        BitmapDrawable d = new BitmapDrawable(mAtt.getResources(), bmp);
-        d.setFilterBitmap(false);   // disegni a pixel: meglio nitidi che sfumati
-        mImmagine.setImageDrawable(d);
-
-        // Riempie l'ALTEZZA e ingrandisce ancora un po': e' la parte "zoomata sul
-        // centro". Il Pokemon sta al centro dell'immagine, quindi l'inquadratura
-        // parte da li'.
-        final float scala = Math.max((float) vh / bmp.getHeight(),
-                                     (float) vw / bmp.getWidth()) * 1.12f;
-        final float largaDavvero = bmp.getWidth() * scala;
-        final float eccedenza = Math.max(0f, largaDavvero - vw);
-        final float centro = -eccedenza / 2f;
-
-        // QUANTO SCORRE, e perche' non da un capo all'altro. Le immagini sono
-        // larghe 3072 px: attraversarle tutte porterebbe il Pokemon fuori
-        // dall'inquadratura per la meta' del tempo -- si vedeva nella prova a
-        // tre fotogrammi. Quindi si scorre di mezza larghezza di schermo intorno
-        // al centro: su 79 secondi sono circa 7 px al secondo, il soggetto non
-        // esce mai e il movimento si nota solo se lo guardi.
-        final float corsa = Math.min(eccedenza, vw * 0.5f);
-        final boolean versoSinistra = mCaso.nextBoolean();
-        final float da = centro + (versoSinistra ? corsa / 2f : -corsa / 2f);
-        final float a  = centro + (versoSinistra ? -corsa / 2f : corsa / 2f);
-        final float dy = (vh - bmp.getHeight() * scala) / 2f;
-
-        final Matrix m = new Matrix();
-        applica(m, scala, da, dy);
-
-        long durata = Math.max(durataAttesa(), 30000L);
-        mScorrimento = ValueAnimator.ofFloat(da, a);
-        mScorrimento.setDuration(durata);
-        mScorrimento.setInterpolator(new LinearInterpolator());
-        mScorrimento.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
-            @Override public void onAnimationUpdate(ValueAnimator an)
-            {
-                if (mImmagine == null) return;
-                applica(m, scala, (Float) an.getAnimatedValue(), dy);
+        if (mChiusa || mVisibile == null || mNascosta == null) return;
+        final int vw = mVisibile.getWidth();
+        final int vh = mVisibile.getHeight();
+        if (vw <= 0 || vh <= 0) {           // la vista non ha ancora una misura
+            mMano.postDelayed(new Runnable() {
+                @Override public void run() { prossimaImmagine(); }
+            }, 60);
+            return;
+        }
+        if (mFile.isEmpty()) {
+            mFile = elencoImmagini();
+            if (mFile.isEmpty()) {          // niente cartella: l'immagine dell'APK
+                mostra(riserva(), vw, vh, true);
+                return;
             }
-        });
-        mScorrimento.start();
+        }
+        File f = mFile.get(mIndice % mFile.size());
+        mIndice++;
+        Bitmap bmp = leggi(f);
+        if (bmp == null) {
+            mFile.remove(f);                // illeggibile: non ci si torna
+            prossimaImmagine();
+            return;
+        }
+        mostra(bmp, vw, vh, mPrima);
+        mPrima = false;
+        mMano.postDelayed(new Runnable() {
+            @Override public void run() { prossimaImmagine(); }
+        }, CAMBIO_MS);
     }
 
-    private void applica(Matrix m, float scala, float dx, float dy)
+    private void mostra(Bitmap bmp, int vw, int vh, boolean senzaDissolvenza)
+    {
+        if (bmp == null) return;
+        final ImageView vista = mNascosta;
+        BitmapDrawable d = new BitmapDrawable(mAtt.getResources(), bmp);
+        d.setFilterBitmap(false);      // disegni a pixel: nitidi, non sfumati
+        vista.setImageDrawable(d);
+
+        // riempie l'altezza e ingrandisce ancora un po': la parte "zoomata sul
+        // centro", dove sta il Pokemon
+        final float scala = Math.max((float) vh / bmp.getHeight(),
+                                     (float) vw / bmp.getWidth()) * ZOOM;
+        final float eccedenza = Math.max(0f, bmp.getWidth() * scala - vw);
+        final float centro = -eccedenza / 2f;
+        final float voluta = SPOSTAMENTO_PX_S * (CAMBIO_MS + DISSOLVENZA_IMG_MS) / 1000f;
+        final float corsa = Math.min(eccedenza, voluta);
+        mVersoDestra = !mVersoDestra;   // un'immagine da una parte, la prossima dall'altra
+        final float da = centro + (mVersoDestra ? -corsa / 2f : corsa / 2f);
+        final float a  = centro + (mVersoDestra ? corsa / 2f : -corsa / 2f);
+        final float dy = (vh - bmp.getHeight() * scala) / 2f;
+        final Matrix m = new Matrix();
+        applica(vista, m, scala, da, dy);
+
+        ValueAnimator an = ValueAnimator.ofFloat(da, a);
+        an.setDuration(CAMBIO_MS + DISSOLVENZA_IMG_MS + 400L);
+        an.setInterpolator(new LinearInterpolator());
+        an.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+            @Override public void onAnimationUpdate(ValueAnimator av)
+            {
+                applica(vista, m, scala, (Float) av.getAnimatedValue(), dy);
+            }
+        });
+        an.start();
+
+        final ImageView vecchia = mVisibile;
+        if (senzaDissolvenza) {
+            vista.setAlpha(1f);
+            vecchia.setAlpha(0f);
+        } else {
+            vista.animate().alpha(1f).setDuration(DISSOLVENZA_IMG_MS).start();
+            vecchia.animate().alpha(0f).setDuration(DISSOLVENZA_IMG_MS).start();
+        }
+        if (mScorrimento != null) mScorrimento.cancel();
+        mScorrimento = an;
+
+        // scambio i ruoli: la vista appena riempita e' quella in vista
+        mVisibile = vista;
+        mNascosta = vecchia;
+    }
+
+    private void applica(ImageView vista, Matrix m, float scala, float dx, float dy)
     {
         m.setScale(scala, scala);
         m.postTranslate(dx, dy);
-        mImmagine.setImageMatrix(m);
+        vista.setImageMatrix(m);
     }
 
     /**
@@ -326,7 +398,12 @@ public class SchermataCaricamento
         return c;
     }
 
-    private Bitmap scegliImmagine()
+    /**
+     * L'elenco delle immagini, mischiato. Si legge UNA VOLTA e poi si scorre in
+     * ordine: pescando a caso ogni quattro secondi la stessa immagine tornerebbe
+     * due volte di fila, che a schermo sembra un difetto.
+     */
+    private List<File> elencoImmagini()
     {
         List<File> file = new ArrayList<File>();
         boolean gestoreStorage = false;
@@ -347,37 +424,44 @@ public class SchermataCaricamento
                 continue;
             for (File f : tutti) {
                 String n = f.getName().toLowerCase();
-                boolean immagine = n.endsWith(".png") || n.endsWith(".jpg")
-                                   || n.endsWith(".jpeg") || n.endsWith(".webp");
-                if (!immagine)
-                    continue;
                 // Niente isFile(): non e' un controllo che serve -- se il file
                 // non si apre se ne accorge chi decodifica -- e una domanda in
                 // meno e' una risposta sbagliata in meno.
                 // (Per la cronaca: avevo incolpato isFile() del difetto della
                 // prima prova. Non era lui: era la cartella sbagliata, vedi
                 // cartellaGioco(). Il log lo ha detto, il sospetto no.)
-                Log.i(TAG, "   trovata " + f.getName() + " (" + f.length() + " byte)");
-                file.add(f);
+                if (n.endsWith(".png") || n.endsWith(".jpg")
+                        || n.endsWith(".jpeg") || n.endsWith(".webp"))
+                    file.add(f);
             }
             if (!file.isEmpty())
                 break;
         }
-        if (file.isEmpty()) {
-            Log.i(TAG, "nessuna immagine in " + CARTELLA + ": resta quella dell'APK");
+        Collections.shuffle(file, mCaso);
+        Log.i(TAG, "immagini di caricamento: " + file.size());
+        return file;
+    }
+
+    private Bitmap riserva()
+    {
+        Log.i(TAG, "nessuna immagine in " + CARTELLA + ": resta quella dell'APK");
+        try {
             return BitmapFactory.decodeResource(mAtt.getResources(),
                                                 R.drawable.schermata_iniziale);
+        } catch (Throwable t) {
+            return null;
         }
-        File scelta = file.get(mCaso.nextInt(file.size()));
-        Log.i(TAG, "immagine di caricamento: " + scelta.getName()
-                   + " (fra " + file.size() + ")");
+    }
+
+    private Bitmap leggi(File f)
+    {
         try {
-            return leggiBitmap(scelta, 1);
+            return leggiBitmap(f, 1);
         } catch (OutOfMemoryError e) {
-            Log.w(TAG, "immagine troppo grande, la dimezzo: " + scelta.getName());
-            try { return leggiBitmap(scelta, 2); } catch (Throwable t) { return null; }
+            Log.w(TAG, "immagine troppo grande, la dimezzo: " + f.getName());
+            try { return leggiBitmap(f, 2); } catch (Throwable t) { return null; }
         } catch (Exception e) {
-            Log.w(TAG, "immagine illeggibile " + scelta.getName() + ": " + e);
+            Log.w(TAG, "immagine illeggibile " + f.getName() + ": " + e);
             return null;
         }
     }
@@ -491,7 +575,8 @@ public class SchermataCaricamento
               .withEndAction(new Runnable() {
                   @Override public void run()
                   {
-                      mImmagine = null;
+                      mVisibile = null;
+                      mNascosta = null;
                       if (mAlTermine != null) mAlTermine.run();
                   }
               }).start();

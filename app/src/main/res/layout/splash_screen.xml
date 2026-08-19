@@ -36,11 +36,23 @@
     android:clickable="true"
     android:focusable="true"
 >
+    <!-- DUE viste sovrapposte, non una: l'immagine cambia ogni 4 secondi e il
+         passaggio si fa dissolvendo la nuova sopra la vecchia. Con una sola vista
+         il cambio sarebbe uno scatto. Quella nascosta sta a alpha 0. -->
     <ImageView
         android:id="@+id/splash_image"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:scaleType="matrix"
+        android:contentDescription="@string/app_name"
+    />
+
+    <ImageView
+        android:id="@+id/splash_image2"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="matrix"
+        android:alpha="0"
         android:contentDescription="@string/app_name"
     />
 
